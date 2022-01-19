@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Tuple, cast
 
+from tabulate import tabulate
 from tqdm import tqdm
 
 from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT, check_mp4_integrity, download_m3u8_file

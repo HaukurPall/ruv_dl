@@ -14,7 +14,7 @@ from ruv_dl.ruv_client import Programs
 
 log = logging.getLogger("ruvsarpur")
 
-config = main.Config()
+CONFIG = main.Config()
 
 
 @click.group()
@@ -29,10 +29,10 @@ the program list is cached as "$WORK_DIR/programs.json", etc..
 )
 @click.option("--log-level", default="WARNING", help="The log level of the stdout. WARNING by default.")
 def cli(work_dir: Path, log_level):
-    global config
+    global CONFIG
     # Create the config and save as a global variable
-    config = main.Config(work_dir)
-    config.initialize_dirs()
+    CONFIG = main.Config(work_dir)
+    CONFIG.initialize_dirs()
 
     log.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s: %(message)s", "%Y-%m-%d %H:%M:%S")
@@ -41,7 +41,7 @@ def cli(work_dir: Path, log_level):
     stdout_handler.setLevel(log_level)
     stdout_handler.setFormatter(formatter)
 
-    file_handler = RotatingFileHandler(config.run_log, maxBytes=10000, backupCount=1)
+    file_handler = RotatingFileHandler(CONFIG.run_log, maxBytes=10000, backupCount=1)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
 
@@ -54,31 +54,29 @@ def cli(work_dir: Path, log_level):
 @cli.command()
 @click.argument("patterns", type=str, nargs=-1, required=True)
 @click.option(
-    "--ignore-case/--no-ignore-case", default=config.ignore_case, help="Should we ignore casing when searching?"
+    "--ignore-case/--no-ignore-case", default=CONFIG.ignore_case, help="Should we ignore casing when searching?"
 )
-@click.option("--only-ids/--no-only-ids", default=config.only_ids, help="Should we only return the found program ids?")
+@click.option("--only-ids/--no-only-ids", default=CONFIG.only_ids, help="Should we only return the found program ids?")
 @click.option(
     "--force-reload-programs/--no-force-reload-programs",
-    default=config.force_reload_programs,
+    default=CONFIG.force_reload_programs,
     help="Should we force reloading the program list?",
 )
 def search(patterns: Tuple[str, ...], ignore_case: bool, only_ids: bool, force_reload_programs: bool):
     """Search for a program based on the patterns provided.
     Make sure that each pattern is separated by a space by surrounding each pattern with quotation marks:
     "pattern one" "pattern two"."""
-    global config
-    config.ignore_case = ignore_case
-    config.only_ids = only_ids
-    config.force_reload_programs = force_reload_programs
-    # TODO: Add support for checking date of last programs fetch.
-    found_programs = main.search(patterns=patterns, config=config)
-    if config.only_ids:
+    CONFIG.ignore_case = ignore_case
+    CONFIG.only_ids = only_ids
+    CONFIG.force_reload_programs = force_reload_programs
+    found_programs = main.search(patterns=patterns, config=CONFIG)
+    if CONFIG.only_ids:
         return click.echo(" ".join([str(id) for id in found_programs]))
     headers, rows = program_results(found_programs)
     return click.echo(tabulate(tabular_data=rows, headers=headers, tablefmt="github"))
 
 
-def maybe_read_stdin(ctx, param, value):
+def maybe_read_stdin(_ctx, _param, value):
     if not value and not click.get_text_stream("stdin").isatty():
         return click.get_text_stream("stdin").read().strip().split(" ")
     else:
@@ -93,20 +91,19 @@ def maybe_read_stdin(ctx, param, value):
 The default value, when not supplied, is 1080p.
 """,
     type=click.Choice(list(QUALITIES_STR_TO_INT.keys())),
-    default=config.quality,
+    default=CONFIG.quality,
 )
 @click.option(
     "--force-reload-programs/--no-force-reload-programs",
-    default=config.force_reload_programs,
+    default=CONFIG.force_reload_programs,
     help="Should we force reloading the program list?",
 )
 def download_program(program_ids: Tuple[str, ...], quality: str, force_reload_programs):
     """Download the supplied program ids. Can be multiple.
     Use the 'search' functionality with --only-ids to get them and pipe them to this command."""
-    global config
-    config.quality = quality
-    config.force_reload_programs = force_reload_programs
-    downloaded_episodes, skipped_episodes = main.download_program(program_ids=program_ids, config=config)
+    CONFIG.quality = quality
+    CONFIG.force_reload_programs = force_reload_programs
+    downloaded_episodes, skipped_episodes = main.download_program(program_ids=program_ids, config=CONFIG)
     if len(downloaded_episodes) == 0 and len(skipped_episodes) == 0:
         click.echo("No episodes downloaded.")
     click.echo("\n".join(episode.file_name() for episode in chain(downloaded_episodes, skipped_episodes)))
@@ -115,7 +112,7 @@ def download_program(program_ids: Tuple[str, ...], quality: str, force_reload_pr
 @cli.command()
 @click.option(
     "--dry-run/--no-dry-run",
-    default=config.dry_run,
+    default=CONFIG.dry_run,
     help="Only mimic the organization of shows - do not actually move them.",
 )
 def organize(dry_run: bool):
@@ -124,23 +121,22 @@ def organize(dry_run: bool):
     The show format is understood by plex and other tools such as tvrenamer.
     Please note that the show number is from RÚV and is often wrong.
     """
-    global config
-    config.dry_run = dry_run
-    click.echo(main.organize(config=config))
+    CONFIG.dry_run = dry_run
+    click.echo(main.organize(config=CONFIG))
 
 
 @cli.command()
 @click.argument("program-ids", nargs=-1, type=str, callback=maybe_read_stdin)
 @click.option(
     "--force-reload-programs/--no-force-reload-programs",
-    default=config.force_reload_programs,
+    default=CONFIG.force_reload_programs,
     help="Should we force reloading the program list?",
 )
 def details(program_ids: Tuple[str, ...], force_reload_programs: bool):
     """Get the details of all the episodes of the supplied program ids. Can be multiple."""
-    global config
-    config.force_reload_programs = force_reload_programs
-    click.echo(main.details(program_ids, config=config))
+    global CONFIG
+    CONFIG.force_reload_programs = force_reload_programs
+    click.echo(main.details(program_ids, config=CONFIG))
 
 
 ProgramRow = Tuple[str, str, int, str, str]
@@ -163,9 +159,9 @@ def program_results(programs: Programs) -> Tuple[ProgramHeader, List[ProgramRow]
                 )
             )
         except KeyError:
-            log.warn("Malformed program: %s", program)
+            log.warning("Malformed program: %s", program)
         except AttributeError:
-            log.warn("Malformed program: %s", program)
+            log.warning("Malformed program: %s", program)
     return header, rows
 
 

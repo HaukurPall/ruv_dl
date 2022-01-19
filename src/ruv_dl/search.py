@@ -1,6 +1,5 @@
 """A module for searching for programs."""
 import logging
-from typing import List, Tuple
 
 from ruv_dl.ruv_client import Programs
 
