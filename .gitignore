@@ -1,5 +1,8 @@
 downloads/
-*.mp4
+orgranized/
+
+# Poetry
+poetry.lock
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

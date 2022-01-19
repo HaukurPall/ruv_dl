@@ -1,13 +1,12 @@
 # RÚV-DL
 
-This projected is motivated by https://github.com/sverrirs/ruvsarpur.
-The original plan was to fork that repo and improve upon it, but it was easier to approch the problem from scratch.
+RÚV-DL (`ruv-dl`) is terminal line client for downloading files from [RÚV](https://ruv.is/).
 
-RÚV-DL is
+It handles the following tasks:
 
-- A specialized RÚV graphql client
-- A wrapper around ffmpeg
-- A book-keeper
+- Query RÚV graphql API for program information
+- Wraps ffmpeg to download the video files
+- Caches and keeps track of downloaded files
 
 # Installation
 
@@ -22,18 +21,23 @@ And then:
 pip install git+https://github.com/HaukurPall/ruv_dl
 ```
 
+## Motivation
+
+This projected is motivated by [ruvsarpur](https://github.com/sverrirs/ruvsarpur).
+The original plan was to fork that repo and improve upon it, but it was easier to approch the problem from scratch.
+
 # Usage
 
 This program is not as fully featured as the original ruvsarpur but it has these benefits:
 
 - Faster downloading of the available programs on ruv.is
 - More available tv programs and radio shows and podcasts.
-- Simple terminal client; `ruv`.
+- Simple terminal client; `ruv-dl`.
 
 Example usage: Download all episodes of a single program.
 
 ```bash
-ruv search "hvolpasveitin" --ignore-case --only-ids | ruv download-program
+ruv-dl search "hvolpasveitin" --ignore-case --only-ids | ruv-dl download-program
 ```
 
 This will:
@@ -42,7 +46,7 @@ This will:
 - Output the program ids found and pipe them to the next command.
 - The second command will download all missing episodes (not previously downloaded) of those programs.
 
-As a side-effect, some files are generated in the current working directory in process:
+As a side-effect, some files are generated in the **current working directory** in process:
 
 - `downloads/` folder, contains the downloaded files
 - `organized/` folder, explained in the [organize](##organize) section.
@@ -51,10 +55,34 @@ As a side-effect, some files are generated in the current working directory in p
 - `debug.log` file, logging information from the program
 - `downloaded.jsonl` file, contains information about the programs downloaded
 
-## Search
+## Main command
 
-```
-ruvsarpur --work-dir $PWD search "hvolpa" "sámur" "skotti" "lestrarhvutti" "úmísúmí" "kúlu" "klingjur" "teitur" "blæja" "hrúturinn" --ignore-case
+`ruv-dl` is the main command.
+It takes two options:
+
+- `--work-dir`: The working directory where the program will store its files. By default, the current working directory.
+- `--log-level`: The log level. By default it is `WARNING`.
+
+For more details see `ruv-dl --help` or any of the subcommands' help `ruv-dl <subcommand> --help`.
+
+All the following commands are subcommands of `ruv-dl`.
+
+## `search`
+
+The search command is used to search for programs.
+It can take multiple search terms and will output a nice table with the programs found.
+If the search term contains spaces, be sure to wrap it in quotes.
+
+The search command takes the following options:
+
+- `--ignore-case`: Ignore case when searching.
+- `--only-ids`: Only output the program ids found, not a nice table. This is useful for piping the ids to the next command.
+- `--force-reload-programs`: Force reloading the `programs.json` file. By default, it is reloaded if it is older than 10 minutes.
+
+An example usage of searching using multiple search terms and `--ignore-case`:
+
+```bash
+ruv-dl search "hvolpa" "sámur" "skotti" "lestrarhvutti" "úmísúmí" "kúlu" "klingjur" "teitur" "blæja" "hrúturinn" --ignore-case
 # prints
 | Program title                   | Foreign title             |   Episode count |   Program ID | Short description                        |
 |---------------------------------|---------------------------|-----------------|--------------|------------------------------------------|
@@ -70,31 +98,59 @@ ruvsarpur --work-dir $PWD search "hvolpa" "sámur" "skotti" "lestrarhvutti" "úm
 | Hrúturinn Hreinn: Björgun Teits |                           |               1 |        32509 | Hreinn og vinir hans leggjast í leiðangu |
 ```
 
-## Download
+The search command stores the programs found in the `programs.json` file and writes a timestamp to the `programs_last_fetched.txt` file.
+The timestamp is read before querying the graphql API to avoid querying the graphql API if the programs.json file is newer than 10 minutes.
 
-To download shows you supply the `download-program` command a list of program ids to download.
+## `download-program`
 
-The easiest way to do this is to append `--only-ids` to the search command and pipe it to the `download-program` command:
+The download command is used to download all missing episodes of a program into `downloads/`.
+It takes program ids as arguments.
+
+It takes the following options:
+
+- `--force-reload-programs`: Force reloading the `programs.json` file. By default, it is reloaded if it is older than 10 minutes.
+- `--quality`: The video quality to download. By default, it is `1080p`, but you can also use `720p`, `480p`, `360p` and `240p`.
+
+The easiest way to download programs is to append `--only-ids` to the `search` command and pipe it to the `download-program` command:
 
 ```
-ruvsarpur --work-dir $PWD search "hvolpa" "sámur" "skotti" "lestrarhvutti" "úmísúmí" "kúlu" "klingjur" "teitur" "blæja" "hrúturinn" --ignore-case --only-ids | ruvsarpur --work-dir $PWD download-program
+ruv-dl search "hvolpa" "sámur" "blæja" --ignore-case --only-ids | ruv-dl download-program
+# prints
+Downloading Blæja - Þáttur 8 af 52: 100%|████████████| 2/2 [00:44<00:00, 22.29s/it]
+Downloaded 2 episodes
 ```
 
-### Keeping track of downloaded shows
+These shows are now present in the `downloads/` folder.
 
-The script keeps track of the shows that have already been downloaded so that you do not download them again.
+```
+$ ls downloads/
+Blæja ||| Þáttur 8 af 52 ||| Bluey [1080p].mp4  Blæja ||| Þáttur 9 af 52 ||| Bluey [1080p].mp4
+```
 
-TODO: Explain how.
+The naming convention of the downloaded files is:
+Program title ||| Episode title ||| Program title \[QUALITY\].mp4
 
-### Choosing video quality
+### The `downloaded.jsonl` file
 
-The script automatically attempts to download videos using the highest video quality for all download streams, this is equivilent of Full-HD resolution or 3600kbps.
+When the download command is run, it will create a `downloaded.jsonl` file.
+This file contains information about the episodes downloaded and is used to avoid downloading the same episode again.
 
-TODO: Explain other options
+If you want to re-download all episodes, you can delete the `downloaded.jsonl` file and run the `download-program` command again.
+If you want to re-download a single episodes, you can find the corresponding line in the file and delete it and run the `download-program` command again.
 
-## Organize
+## `organize` and the `organized/` folder
 
-## Scheduling
+## Debugging
+
+Check the `debug.log` file for more information and/or increase the `--log-level` to `DEBUG` to see more in the stderr.
+
+The `debug.log` file is rotated, so it will not grow indefinitely.
+
+## Scheduling the `ruv-dl` command
+
+TODO: Explain scheduling
+
+### Linux
 
 ```bash
 ~/.config/systemd/user/dl_ruv.service
@@ -104,7 +160,7 @@ Description=Download content from RÚV
 
 [Service]
 Type=simple
-ExecStart=/home/haukurpj/Projects/ruv-dl/fetch_all.fish
+ExecStart=%HOME/Projects/ruv-dl/fetch_all.fish
 
 [Install]
 WantedBy=default.target
@@ -143,15 +199,20 @@ Features to be added
 
 - Handling of mp3 downloading.
 - Create a main class instead of config class.
-- Refactor main class to return objects and refactor cli to turn those objects to some readable format.
-- Return a list of donwloaded episodes from download.
+- Add support for checking downloaded episodes which are no longer available.
 
-Testing required
+### Testing required
 
 - Are the subtitles burnt into the mp4 video stream or are they in their own stream?
+
+### `schema.graphql`
+
+There is a graphql schema within the project, but it is not the official schema.
+It is hand-constructed since the endpoint disallows introspection.
+Therefore, it might contain errors and is not used to validate the queries.
 
 ## Disclaimer
 
 You are not the owner/copyright holder of the content you download and neither am I.
 You are not allowed to distribute the content you download.
-You are expected to delete the content when it is no longer available on RÚV.
+You are expected to delete the content when it is no longer available on RÚV. A feature to delete the content is planned.

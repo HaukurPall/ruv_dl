@@ -1,14 +1,18 @@
 import logging
 import sys
+from itertools import chain
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Tuple
 
 import click
+from tabulate import tabulate
 
 from ruv_dl import main
+from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT
+from ruv_dl.ruv_client import Programs
 
-logger = logging.getLogger("ruvsarpur")
+log = logging.getLogger("ruvsarpur")
 
 config = main.Config()
 
@@ -17,21 +21,20 @@ config = main.Config()
 @click.option(
     "--work-dir",
     help="""The working directory of the program, the current working directory by default.
-For example downloaded content is placed in the folder "$WORK_DIR/downloads".
-The program list is cached as "$WORK_DIR/programs.json".
-The downloaded episode list is stored in "$WORK_DIR/downloaded.log".
+For example downloaded content is placed in the folder "$WORK_DIR/downloads",
+the program list is cached as "$WORK_DIR/programs.json", etc..
 """,
     default=Path.cwd(),
     type=Path,
 )
-@click.option("--log-level", default="WARNING", help="The log level of the stdout.")
+@click.option("--log-level", default="WARNING", help="The log level of the stdout. WARNING by default.")
 def cli(work_dir: Path, log_level):
     global config
     # Create the config and save as a global variable
     config = main.Config(work_dir)
     config.initialize_dirs()
 
-    logger.setLevel(logging.INFO)
+    log.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
     stdout_handler = logging.StreamHandler(sys.stderr)
@@ -42,8 +45,8 @@ def cli(work_dir: Path, log_level):
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
 
-    logger.addHandler(file_handler)
-    logger.addHandler(stdout_handler)
+    log.addHandler(file_handler)
+    log.addHandler(stdout_handler)
     # Increase the log level of gql - otherwise we are spammed
     logging.getLogger("gql").setLevel(logging.WARN)
 
@@ -68,7 +71,11 @@ def search(patterns: Tuple[str, ...], ignore_case: bool, only_ids: bool, force_r
     config.only_ids = only_ids
     config.force_reload_programs = force_reload_programs
     # TODO: Add support for checking date of last programs fetch.
-    click.echo(main.search(patterns=patterns, config=config))
+    found_programs = main.search(patterns=patterns, config=config)
+    if config.only_ids:
+        return click.echo(" ".join([str(id) for id in found_programs]))
+    headers, rows = program_results(found_programs)
+    return click.echo(tabulate(tabular_data=rows, headers=headers, tablefmt="github"))
 
 
 def maybe_read_stdin(ctx, param, value):
@@ -83,11 +90,9 @@ def maybe_read_stdin(ctx, param, value):
 @click.option(
     "--quality",
     help="""The quality of the file to download.
-The default value, when not supplied, is the highest quality.
-Usually ranges from 0-4, where 0 is the worst quality (426x240) and 4 is the best (1920x1080) = Full HD or 1080p.
-3 tends to be 1280x720 = HD or 720p.
+The default value, when not supplied, is 1080p.
 """,
-    type=int,
+    type=click.Choice(list(QUALITIES_STR_TO_INT.keys())),
     default=config.quality,
 )
 @click.option(
@@ -95,13 +100,16 @@ Usually ranges from 0-4, where 0 is the worst quality (426x240) and 4 is the bes
     default=config.force_reload_programs,
     help="Should we force reloading the program list?",
 )
-def download_program(program_ids: Tuple[str, ...], quality: Optional[int], force_reload_programs):
+def download_program(program_ids: Tuple[str, ...], quality: str, force_reload_programs):
     """Download the supplied program ids. Can be multiple.
     Use the 'search' functionality with --only-ids to get them and pipe them to this command."""
     global config
     config.quality = quality
     config.force_reload_programs = force_reload_programs
-    click.echo(main.download_program(program_ids=program_ids, config=config))
+    downloaded_episodes, skipped_episodes = main.download_program(program_ids=program_ids, config=config)
+    if len(downloaded_episodes) == 0 and len(skipped_episodes) == 0:
+        click.echo("No episodes downloaded.")
+    click.echo("\n".join(episode.file_name() for episode in chain(downloaded_episodes, skipped_episodes)))
 
 
 @cli.command()
@@ -133,6 +141,32 @@ def details(program_ids: Tuple[str, ...], force_reload_programs: bool):
     global config
     config.force_reload_programs = force_reload_programs
     click.echo(main.details(program_ids, config=config))
+
+
+ProgramRow = Tuple[str, str, int, str, str]
+ProgramHeader = Tuple[str, str, str, str, str]
+
+
+def program_results(programs: Programs) -> Tuple[ProgramHeader, List[ProgramRow]]:
+    """Format the program results for printing."""
+    header = ("Program title", "Foreign title", "Episode count", "Program ID", "Short description")
+    rows = []
+    for program in programs.values():
+        try:
+            rows.append(
+                (
+                    program["title"],
+                    program["foreign_title"],
+                    len(program["episodes"]),
+                    program["id"],
+                    program["short_description"][:40] if program["short_description"] is not None else "",
+                )
+            )
+        except KeyError:
+            log.warn("Malformed program: %s", program)
+        except AttributeError:
+            log.warn("Malformed program: %s", program)
+    return header, rows
 
 
 if __name__ == "__main__":

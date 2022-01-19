@@ -23,29 +23,3 @@ def get_all_programs_by_pattern(programs: Programs, pattern: str, ignore_case: b
         if pattern in title or (foreign_title is not None and pattern in foreign_title):
             found_programs[program["id"]] = program
     return found_programs
-
-
-ProgramRow = Tuple[str, str, int, str, str]
-ProgramHeader = Tuple[str, str, str, str, str]
-
-
-def program_results(programs: Programs) -> Tuple[ProgramHeader, List[ProgramRow]]:
-    """Format the program results for printing."""
-    header = ("Program title", "Foreign title", "Episode count", "Program ID", "Short description")
-    rows = []
-    for program in programs.values():
-        try:
-            rows.append(
-                (
-                    program["title"],
-                    program["foreign_title"],
-                    len(program["episodes"]),
-                    program["id"],
-                    program["short_description"][:40] if program["short_description"] is not None else "",
-                )
-            )
-        except KeyError:
-            log.warn("Malformed program: %s", program)
-        except AttributeError:
-            log.warn("Malformed program: %s", program)
-    return header, rows

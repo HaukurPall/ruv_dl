@@ -2,7 +2,6 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Optional
 
-from ruv_dl.ffmpeg import QUALITIES_INT_TO_STR
 from ruv_dl.ruv_client import Episode, Program
 
 
@@ -17,14 +16,14 @@ class EpisodeDownload:
     url: str
 
     @staticmethod
-    def from_episode_and_program(episode: Episode, program: Program, quality_num: int) -> "EpisodeDownload":
+    def from_episode_and_program(episode: Episode, program: Program, quality: str) -> "EpisodeDownload":
         return EpisodeDownload(
             id=episode["id"],
             program_id=program["id"],
             program_title=program["title"],
             title=episode["title"],
             foreign_title=program["foreign_title"],
-            quality_str=QUALITIES_INT_TO_STR[quality_num],
+            quality_str=quality,
             url=episode["file"],
         )
 
