@@ -1,0 +1,62 @@
+# This schema is manually created by exploring returned values returned from ruv.is/gql
+# It probably contains errors so it should not be used to validate queries.
+# This schema cannot be created automatically since the Apollo server running at ruv.is/gql has disabled introspection.
+type Panel {
+  programs: [Program!]
+  programs_count: Int
+  display_style: String
+  slug: String!
+  title: String!
+  type: String
+}
+type Episode {
+  id: ID!
+  image: String!
+  rating: Int
+  title: String!
+  description: String
+  duration: Int
+  firstrun: String
+  scope: String
+  file: String
+  file_expires: String
+  cards: []
+  clips: []
+  subtitles: []
+}
+type Program {
+  description: String!
+  episodes: [Episode!]!
+  foreign_title: String
+  id: ID!
+  image: String
+  portrait_image: String
+  short_description: String
+  slug: String
+  title: String!
+  format: String
+}
+type Featured {
+  metro: [Panel!]!
+  panels: [Panel!]!
+  rest: [Panel!]!
+}
+type Category {
+    title: String!
+    slug: String!
+    programs: [Program!]!
+}
+type CategoryList {
+  categories: Category!
+  name: String!
+  slug: String!
+}
+# born, tv
+type Query {
+  getKrakkaRUVCategory($station: String!, $category: String!): 
+  getSerie(episodeId: ID!, programID: ID!): Program!
+  getEpisode(programID: ID!): Program!
+  getProgram(programID: ID!): Program!
+  getCategories()
+  getCategory()
+}
