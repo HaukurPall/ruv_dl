@@ -1,19 +1,20 @@
 # RÚV-DL
 
-RÚV-DL (`ruv-dl`) is terminal line client for downloading files from [RÚV](https://ruv.is/).
+RÚV-DL (`ruv-dl`) is terminal line client for downloading content from [RÚV](https://ruv.is/).
 
 It handles the following tasks:
 
 - Query RÚV graphql API for program information
 - Wraps ffmpeg to download the video files
 - Caches and keeps track of downloaded files
+- Assist with some common management tasks
 
 # Installation
 
 - Python version 3.8
 - [ffmpeg](https://www.ffmpeg.org/download.html)
 
-Be sure to add ffmpeg to `PATH`, especially windows users.
+Be sure to add `ffmpeg` to `PATH`, especially windows users.
 
 And then:
 
@@ -72,6 +73,7 @@ All the following commands are subcommands of `ruv-dl`.
 The search command is used to search for programs.
 It can take multiple search terms and will output a nice table with the programs found.
 If the search term contains spaces, be sure to wrap it in quotes.
+The command searches for substring matches in the program title and foreign title (if any).
 
 The search command takes the following options:
 
@@ -117,7 +119,7 @@ The easiest way to download programs is to append `--only-ids` to the `search` c
 ruv-dl search "hvolpa" "sámur" "blæja" --ignore-case --only-ids | ruv-dl download-program
 # prints
 Downloading Blæja - Þáttur 8 af 52: 100%|████████████| 2/2 [00:44<00:00, 22.29s/it]
-Downloaded 2 episodes
+...
 ```
 
 These shows are now present in the `downloads/` folder.
@@ -128,7 +130,7 @@ Blæja ||| Þáttur 8 af 52 ||| Bluey [1080p].mp4  Blæja ||| Þáttur 9 af 52 |
 ```
 
 The naming convention of the downloaded files is:
-Program title ||| Episode title ||| Program title \[QUALITY\].mp4
+`Program title ||| Episode title ||| foreign title [QUALITY].mp4`
 
 ### The `downloaded.jsonl` file
 
@@ -140,11 +142,16 @@ If you want to re-download a single episodes, you can find the corresponding lin
 
 ## `organize` and the `organized/` folder
 
-## Debugging
+Understood by Plex
+Assumes TV shows and season 1 and "þáttur x af y"
 
-Check the `debug.log` file for more information and/or increase the `--log-level` to `DEBUG` to see more in the stderr.
+### Incorrect episodes numbers in RÚV
 
-The `debug.log` file is rotated, so it will not grow indefinitely.
+### Missing foreign titles - `translations.json`
+
+## `details`
+
+TODO
 
 ## Scheduling the `ruv-dl` command
 
@@ -193,17 +200,26 @@ systemctl --user enable dl_ruv.timer
 https://opensource.com/article/20/7/systemd-timers
 https://fedoramagazine.org/systemd-timers-for-scheduling-tasks/
 
+## Sending a telegram message
+
+TODO
+
 ## Development
 
-Features to be added
+If you are interested in this project; check out the code, open up issues and send PRs.
+
+### Debugging
+
+Check the `debug.log` file for more information and/or increase the `--log-level` to `DEBUG` to see more in the stderr.
+
+The `debug.log` file is rotated, so it will not grow indefinitely.
+
+### Planned features
 
 - Handling of mp3 downloading.
-- Create a main class instead of config class.
+- `check` command to check if mp4 files are ok on demand.
+- `split` command to split a mp4 file into two different files based on a timestamp.
 - Add support for checking downloaded episodes which are no longer available.
-
-### Testing required
-
-- Are the subtitles burnt into the mp4 video stream or are they in their own stream?
 
 ### `schema.graphql`
 

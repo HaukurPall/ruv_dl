@@ -134,7 +134,6 @@ def organize(dry_run: bool):
 )
 def details(program_ids: Tuple[str, ...], force_reload_programs: bool):
     """Get the details of all the episodes of the supplied program ids. Can be multiple."""
-    global CONFIG
     CONFIG.force_reload_programs = force_reload_programs
     click.echo(main.details(program_ids, config=CONFIG))
 
