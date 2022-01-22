@@ -178,6 +178,7 @@ def load_programs(
 ) -> Programs:
     """Load the programs by either loading from cache or by querying ruv.is."""
     last_fetched = load_last_fetched(last_fetched_file)
+    fetched = False
     # We have not fetched before
     if last_fetched is None:
         force_reload = True
@@ -188,13 +189,16 @@ def load_programs(
         force_reload = True
     if force_reload:
         programs = RUVClient().get_all_programs()
+        fetched = True
     else:
         try:
             programs = load_programs_cache(programs_cache)
         except FileNotFoundError:
             programs = RUVClient().get_all_programs()
-    save_programs_cache(programs_cache, programs)
-    save_last_fetched(last_fetched_file)
+            fetched = True
+    if fetched:
+        save_programs_cache(programs_cache, programs)
+        save_last_fetched(last_fetched_file)
     num_episodes = sum([len(program["episodes"]) for program in programs.values()])
     log.info(f"Loaded {len(programs)} programs and {num_episodes} episodes")
     return programs
