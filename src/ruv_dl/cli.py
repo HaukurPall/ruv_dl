@@ -110,19 +110,20 @@ def download_program(program_ids: Tuple[str, ...], quality: str, force_reload_pr
 
 
 @cli.command()
+@click.argument("shows", nargs=-1, type=str)
 @click.option(
     "--dry-run/--no-dry-run",
     default=CONFIG.dry_run,
     help="Only mimic the organization of shows - do not actually move them.",
 )
-def organize(dry_run: bool):
+def organize(shows: List[str], dry_run: bool):
     """Organizes **TV shows** from the 'downloads' directory to the 'organized' directory.
     This is a 'best effort' approach as many TV shows do not contain enough information for correct organization.
     The show format is understood by plex and other tools such as tvrenamer.
     Please note that the show number is from RÚV and is often wrong.
     """
     CONFIG.dry_run = dry_run
-    click.echo(main.organize(config=CONFIG))
+    click.echo(main.organize([Path(show) for show in shows], config=CONFIG))
 
 
 @cli.command()

@@ -104,13 +104,13 @@ def download_program(
     return downloaded_episodes, skipped_episodes
 
 
-def organize(config: Config):
+def organize(shows: List[Path], config: Config):
     """
     Organize shows into seasons and directories. A best effort approach.
     """
     translations = read_translations(config.translations)
     _organize(
-        downloads_dir=config.download_dir,
+        episodes_to_organize=shows,
         destination_dir=config.organization_dest_dir,
         translations=translations,
         dry_run=config.dry_run,
