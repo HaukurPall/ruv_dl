@@ -27,6 +27,11 @@ pip install git+https://github.com/HaukurPall/ruv_dl
 This projected is motivated by [ruvsarpur](https://github.com/sverrirs/ruvsarpur).
 The original plan was to fork that repo and improve upon it, but it was easier to approch the problem from scratch.
 
+## Versions
+
+- 1.1.0: Improved download tracking. Now we compare the program title and the episode's firstrun date to see if the file is already downloaded. This is to avoid downloading the same file multiple times, even when they have different ids (according to RÚV).
+- 1.0.0: Initial release. Search, download and download tracking.
+
 # Usage
 
 This program is not as fully featured as the original ruvsarpur but it has these benefits:

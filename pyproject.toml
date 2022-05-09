@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ruv-dl"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python script to download content off the Icelandic RÚV website."
 authors = ["Haukur Páll Jónsson <haukurpalljonsson@gmail.com>"]
 license = "MIT License"
