@@ -77,6 +77,7 @@ def search(patterns: Tuple[str, ...], ignore_case: bool, only_ids: bool, force_r
 
 
 def maybe_read_stdin(_ctx, _param, value):
+    """Read the stdin if no value is provided"""
     if not value and not click.get_text_stream("stdin").isatty():
         return click.get_text_stream("stdin").read().strip().split(" ")
     else:
@@ -137,6 +138,18 @@ def details(program_ids: Tuple[str, ...], force_reload_programs: bool):
     """Get the details of all the episodes of the supplied program ids. Can be multiple."""
     CONFIG.force_reload_programs = force_reload_programs
     click.echo(main.details(program_ids, config=CONFIG))
+
+
+@cli.command()
+@click.argument("file_path", type=Path)
+@click.argument("timestamp", type=str)
+def split_episode(file_path: Path, timestamp: str):
+    """Split an episode into two episodes based on the timestamp provided [-][<HH>:]<MM>:<SS>[.<m>...]."""
+    result = main.split_episode(file_path, timestamp)
+    if result:
+        click.echo("\n".join((str(path) for path in result)))
+    else:
+        click.echo("Unable to split file.")
 
 
 ProgramRow = Tuple[str, str, int, str, str]

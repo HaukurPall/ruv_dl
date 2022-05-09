@@ -1,13 +1,16 @@
 import json
 import logging
+import re
 from pathlib import Path
-from typing import Dict, List, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
 
 from tabulate import tabulate
 from tqdm import tqdm
 
+from ruv_dl import ffmpeg
 from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT, check_mp4_integrity, download_m3u8_file
 from ruv_dl.hls_downloader import load_m3u8_available_resolutions
+from ruv_dl.organize import _guess_show_num
 from ruv_dl.organize import organize as _organize
 from ruv_dl.ruv_client import Program, Programs, load_programs
 from ruv_dl.search import get_all_programs_by_pattern
@@ -137,6 +140,26 @@ def details(program_ids: Tuple[str, ...], config: Config) -> str:
         rows.extend(p_rows)
 
     return tabulate(tabular_data=rows, headers=p_headers, tablefmt="github")  # type: ignore
+
+
+def split_episode(file_path: Path, timestamp: str) -> Optional[Tuple[Path, Path]]:
+    """Split an episode into two files, the first will have duration=timestamp.
+    The other starts=timestamp."""
+    first_file = file_path.with_suffix(".mp4.part1")
+    second_file = file_path.with_suffix(".mp4.part2")
+    # We check if the filename has EXX-EYY in it, we will use it.
+    filename = file_path.name
+    parent = file_path.parent
+    match = re.match(r".*(E\d+-E\d+).*", filename)
+    if match:
+        show_nums = _guess_show_num(match.group(1))
+        if show_nums is not None:
+            first_file = parent / filename.replace(match.group(1), f"E{show_nums[0]}")
+            second_file = parent / filename.replace(match.group(1), f"E{show_nums[1]}")
+    if ffmpeg.split_mp4_in_two(file_path, timestamp, first_file, second_file):
+        return first_file, second_file
+    else:
+        return None
 
 
 def program_details(program: Program) -> Tuple[List[str], List[List[str]]]:
