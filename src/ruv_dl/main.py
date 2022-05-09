@@ -11,7 +11,7 @@ from ruv_dl.hls_downloader import load_m3u8_available_resolutions
 from ruv_dl.organize import organize as _organize
 from ruv_dl.ruv_client import Program, Programs, load_programs
 from ruv_dl.search import get_all_programs_by_pattern
-from ruv_dl.storage import EpisodeDownload
+from ruv_dl.storage import EpisodeDownload, filter_downloaded_episodes
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +81,9 @@ def download_program(
         for episode in program["episodes"]
     ]
     previously_downloaded_episodes = read_downloaded_episodes(config.download_log)
-    episodes_to_download = [episode for episode in selected_episodes if episode not in previously_downloaded_episodes]
+    episodes_to_download = filter_downloaded_episodes(
+        downloaded_episodes=previously_downloaded_episodes, episodes_to_download=selected_episodes
+    )
     log.info(f"Will download {len(episodes_to_download)} episodes")
     tqdm_iter = tqdm(episodes_to_download)
     try:

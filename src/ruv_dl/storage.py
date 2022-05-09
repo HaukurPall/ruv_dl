@@ -1,12 +1,14 @@
 import json
 from dataclasses import asdict, dataclass
-from typing import Optional
+from typing import List, Optional
 
 from ruv_dl.ruv_client import Episode, Program
 
 
 @dataclass
 class EpisodeDownload:
+    """A downloaded episode"""
+
     id: str
     program_id: str
     program_title: str
@@ -14,6 +16,7 @@ class EpisodeDownload:
     foreign_title: Optional[str]
     quality_str: str
     url: str
+    firstrun: Optional[str] = None
 
     @staticmethod
     def from_episode_and_program(episode: Episode, program: Program, quality: str) -> "EpisodeDownload":
@@ -25,6 +28,7 @@ class EpisodeDownload:
             foreign_title=program["foreign_title"],
             quality_str=quality,
             url=episode["file"],
+            firstrun=episode["firstrun"],
         )
 
     @staticmethod
@@ -43,3 +47,25 @@ class EpisodeDownload:
             r"^(?P<program_title>.+?) \|\|\| (?P<title>.+?) \|\|\| (?P<foreign_title>.+?)(?P<quality_str> \[.+?\])?"
             + f".{extension}"
         )
+
+
+def filter_downloaded_episodes(
+    downloaded_episodes: List[EpisodeDownload], episodes_to_download: List[EpisodeDownload]
+) -> List[EpisodeDownload]:
+    """Filter out episodes that are already downloaded.
+
+    First we check if the title and firstrun are the same.
+    If firstrun is not present we check if the id is the same."""
+    return [
+        episode
+        for episode in episodes_to_download
+        # This might be slow when the downloaded list becomes large
+        if not any(
+            (
+                episode.program_title == downloaded_episode.program_title
+                and episode.firstrun == downloaded_episode.firstrun
+                or episode.id == downloaded_episode.id
+            )
+            for downloaded_episode in downloaded_episodes
+        )
+    ]

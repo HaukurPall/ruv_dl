@@ -13,16 +13,21 @@ log = logging.getLogger(__name__)
 
 
 class Episode(TypedDict):
+    """A single episode"""
+
     id: str
     title: str
     file: str
+    firstrun: str  # 2009-01-01 22:10:00
 
 
 class Program(TypedDict):
+    """A single program"""
+
     id: str
     title: str
-    foreign_title: str
-    short_description: str
+    foreign_title: Optional[str]
+    short_description: Optional[str]
     episodes: List[Episode]
 
 
@@ -111,6 +116,7 @@ class RUVClient:
                         id
                         title
                         file
+                        firstrun
                     }
                     title
                     foreign_title
