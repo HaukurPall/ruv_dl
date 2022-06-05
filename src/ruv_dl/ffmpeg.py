@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 import ffpb
 from tqdm import tqdm
 
-QUALITIES_INT_TO_STR = {0: "240p", 1: "360p", 2: "480p", 3: "720p", 4: "1080p"}
+QUALITIES_INT_TO_STR = {0: "1080p", 1: "720p", 2: "480p"}
 QUALITIES_STR_TO_INT = {value: key for key, value in QUALITIES_INT_TO_STR.items()}
 
 

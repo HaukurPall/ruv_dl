@@ -100,9 +100,11 @@ def download_program(
                 skipped_episodes.append(episode)
                 append_downloaded_episode(config.download_log, episode)
 
-            download_m3u8_file(episode.url, QUALITIES_STR_TO_INT[episode.quality_str], output_file=output_file)
-            downloaded_episodes.append(episode)
-            append_downloaded_episode(config.download_log, episode)
+            if download_m3u8_file(episode.url, QUALITIES_STR_TO_INT[episode.quality_str], output_file=output_file):
+                downloaded_episodes.append(episode)
+                append_downloaded_episode(config.download_log, episode)
+            else:
+                log.error(f"Unable to download m3u8. Check the url with ffmpeg: {episode.url}")
 
     except KeyboardInterrupt:
         log.warning("Stopping.")
