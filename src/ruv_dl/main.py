@@ -156,8 +156,8 @@ def split_episode(file_path: Path, timestamp: str) -> Optional[Tuple[Path, Path]
     if match:
         show_nums = _guess_show_num(match.group(1))
         if show_nums is not None:
-            first_file = parent / filename.replace(match.group(1), f"E{show_nums[0]}")
-            second_file = parent / filename.replace(match.group(1), f"E{show_nums[1]}")
+            first_file = parent / filename.replace(match.group(1), f"E{show_nums[0]:02}")
+            second_file = parent / filename.replace(match.group(1), f"E{show_nums[1]:02}")
     if ffmpeg.split_mp4_in_two(file_path, timestamp, first_file, second_file):
         return first_file, second_file
     else:
