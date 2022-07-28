@@ -12,7 +12,7 @@ from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT, check_mp4_integrity, download_m3
 from ruv_dl.hls_downloader import load_m3u8_available_resolutions
 from ruv_dl.organize import _guess_show_num
 from ruv_dl.organize import organize as _organize
-from ruv_dl.ruv_client import Program, Programs, load_programs
+from ruv_dl.ruv_client import Program, Programs, RUVClient, load_programs
 from ruv_dl.search import get_all_programs_by_pattern
 from ruv_dl.storage import EpisodeDownload, filter_downloaded_episodes
 
@@ -68,19 +68,15 @@ def download_program(
     Use the 'search' functionality with --only-ids to get them and pipe them to this command."""
     downloaded_episodes: List[EpisodeDownload] = []
     skipped_episodes: List[EpisodeDownload] = []
-    programs = load_programs(
-        force_reload=config.force_reload_programs,
-        programs_cache=config.programs_json,
-        last_fetched_file=config.last_run_file,
-    )
     try:
-        selected_programs = [programs[program_id] for program_id in program_ids]
+        selected_programs = RUVClient().get_program_episodes(program_ids=list(program_ids))
     except KeyError:
         log.error("Invalid program id(s): " + ", ".join(program_ids))
         return downloaded_episodes, skipped_episodes
+
     selected_episodes = [
         EpisodeDownload.from_episode_and_program(episode, program, config.quality)
-        for program in selected_programs
+        for program in selected_programs.values()
         for episode in program["episodes"]
     ]
     previously_downloaded_episodes = read_downloaded_episodes(config.download_log)
@@ -130,11 +126,8 @@ def details(program_ids: Tuple[str, ...], config: Config) -> str:
     """
     if len(program_ids) == 0:
         return ""
-    programs = load_programs(
-        force_reload=config.force_reload_programs,
-        programs_cache=config.programs_json,
-        last_fetched_file=config.last_run_file,
-    )
+    
+    programs = RUVClient().get_program_episodes(program_ids=list(program_ids))
     rows = []
     for program_id in program_ids:
         program = programs[program_id]

@@ -28,7 +28,7 @@ class Program(TypedDict):
     title: str
     foreign_title: Optional[str]
     short_description: Optional[str]
-    episodes: List[Episode]
+    episodes: Optional[List[Episode]]
 
 
 Programs = Dict[str, Program]
@@ -43,81 +43,11 @@ class RUVClient:
         self.client = Client(transport=transport, execute_timeout=30)
 
     @staticmethod
-    async def _query_categories(session: AsyncClientSession) -> List[str]:
-        query = gql(
-            """
-            query getCategorys($station: StationSearch!) {
-                Category(station: $station) {
-                    categories {
-                        title
-                        slug
-                    }
-                }
-            }
-            """
-        )
-
-        params = {
-            "station": "tv",
-        }
-        result = await session.execute(query, variable_values=params)
-        category_slugs = [category["slug"] for category in result["Category"]["categories"]]  # type: ignore
-        return category_slugs
-
-    @staticmethod
-    async def _query_category(session: AsyncClientSession, category: str) -> List[Program]:
-        query = gql(
-            """
-            query getKrakkaRUVCategories($station: StationSearch!, $category: String!) {
-                Category(station: $station, category: $category) {
-                    categories {
-                        programs {
-                            short_description
-                            episodes {
-                                id
-                                title
-                                file
-                            }
-                            title
-                            foreign_title
-                            short_description
-                            id
-                        }
-                    }
-                }
-            }
-            """
-        )
-        params = {
-            "station": "tv",
-            "category": category,
-        }
-        result = await session.execute(query, variable_values=params)
-        return [
-            program for category in result["Category"]["categories"] for program in category["programs"]  # type: ignore
-        ]
-
-    async def _get_all_categories(self) -> List[Program]:
-        async with self.client as session:
-            categories = await self._query_categories(session)
-            list_of_programs_lists = await asyncio.gather(
-                *[asyncio.create_task(self._query_category(session, category=category)) for category in categories]
-            )
-            return [program for program_list in list_of_programs_lists for program in program_list]
-
-    @staticmethod
     async def _query_all_programs(session: AsyncClientSession) -> List[Program]:
         query = gql(
             """
             query {
                 Programs {
-                    short_description
-                    episodes {
-                        id
-                        title
-                        file
-                        firstrun
-                    }
                     title
                     foreign_title
                     short_description
@@ -127,32 +57,52 @@ class RUVClient:
             """
         )
         result = await session.execute(query)
-        return [program for program in result["Programs"]]  # type: ignore
-
-    async def _get_all_programs(self) -> Programs:
-        async with self.client as session:
-            programs = await self._query_all_programs(session)
-            programs_dict = {program["id"]: program for program in programs}
-            categories = await self._query_categories(session)
-            list_of_programs_lists = await asyncio.gather(
-                *[asyncio.create_task(self._query_category(session, category=category)) for category in categories]
-            )
-            programs_with_extra_info = {
-                program["id"]: program for program_list in list_of_programs_lists for program in program_list
-            }
-            self._add_extra_info(programs_dict, programs_with_extra_info)
-            return programs_dict
-
-    def get_all_programs(self) -> Programs:
-        return asyncio.run(self._get_all_programs())
+        return [program for program in result["Programs"]]
 
     @staticmethod
-    def _add_extra_info(programs: Programs, programs_extra_info: Programs) -> None:
-        """Adds extra information from another program list to the first one."""
-        for p_id, program in programs.items():
-            if p_id in programs_extra_info:
-                for key in ["short_description", "foreign_title"]:
-                    program[key] = programs_extra_info[program["id"]][key]  # type: ignore
+    async def _query_program_episodes(session: AsyncClientSession, program_id: str) -> Program:
+        query = gql(
+            """
+            query ($program_id: Int!) {
+                Program(id: $program_id) {
+                    title
+                    foreign_title
+                    short_description
+                    id
+                    episodes {
+                        id
+                        title
+                        file
+                        firstrun
+                    }
+                }
+            }
+            """
+            )
+        result = await session.execute(query, variable_values={"program_id": int(program_id)})
+        return result["Program"]
+
+    async def _get_all_programs(self) -> Programs:
+        """Return a list of all programs without episodes."""
+        async with self.client as session:
+            programs = await self._query_all_programs(session)
+            return {program["id"]: program for program in programs}
+
+    async def _get_program_episodes(self, program_ids: List[str]) -> Dict[str, Program]:
+        """Return a list of specified programs with episodes."""
+        async with self.client as session:
+            list_of_programs = await asyncio.gather(
+                *[asyncio.create_task(self._query_program_episodes(session, program_id)) for program_id in program_ids]
+            )
+            return {program_id: program for program_id, program in zip(program_ids, list_of_programs)}
+
+    def get_all_programs(self) -> Programs:
+        """Get all programs from ruv.is."""
+        return asyncio.run(self._get_all_programs())
+
+    def get_program_episodes(self, program_ids: List[str]) -> Dict[str, Program]:
+        """Get episodes for a list of programs."""
+        return asyncio.run(self._get_program_episodes(program_ids))
 
 
 def save_programs_cache(file_path: Path, programs: Programs):
@@ -205,6 +155,5 @@ def load_programs(
     if fetched:
         save_programs_cache(programs_cache, programs)
         save_last_fetched(last_fetched_file)
-    num_episodes = sum([len(program["episodes"]) for program in programs.values()])
-    log.info(f"Loaded {len(programs)} programs and {num_episodes} episodes")
+    log.info(f"Loaded {len(programs)} programs")
     return programs
