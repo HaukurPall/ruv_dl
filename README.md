@@ -29,7 +29,8 @@ The original plan was to fork that repo and improve upon it, but it was easier t
 
 ## Versions
 
-- 1.1.1: Fixed (silent - but deadly) error when downloading program list from RÚV. Reoccurring issues will still be silent which needs to be resolved later. Introduces a new approach to fetching programs and episodes from RÚV which is more efficient than the previous one.
+- 1.1.2: Fixed (silent - but deadly) error when downloading program list from RÚV, after RÚV updated. Reoccurring issues will still be silent which needs to be resolved later. Introduces a new approach to fetching programs and episodes from RÚV which is more efficient than the previous one.
+- 1.1.1: Fixed incorrect stream indexing (of quality) which resulted in a crash and incorrect video quality, after RÚV updated.
 - 1.1.0: Improved download tracking. Now we compare the program title and the episode's firstrun date to see if the file is already downloaded. This is to avoid downloading the same file multiple times, even when they have different ids (according to RÚV).
 - 1.0.0: Initial release. Search, download and download tracking.
 
