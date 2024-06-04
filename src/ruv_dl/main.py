@@ -12,7 +12,7 @@ from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT, check_mp4_integrity, download_m3
 from ruv_dl.hls_downloader import load_m3u8_available_resolutions
 from ruv_dl.organize import _guess_show_num
 from ruv_dl.organize import organize as _organize
-from ruv_dl.ruv_client import Program, Programs, RUVClient, load_programs
+from ruv_dl.ruv_client import Program, Programs, RUVClient
 from ruv_dl.search import get_all_programs_by_pattern
 from ruv_dl.storage import EpisodeDownload, filter_downloaded_episodes
 
@@ -49,15 +49,13 @@ class Config:
 
 def search(patterns: Tuple[str, ...], config: Config) -> Programs:
     """Search for a RÚV program based on the patterns provided.
+    Is limited to main title only.
     Either returns a human readable table with the program results or a string of program ids found."""
-    programs = load_programs(
-        force_reload=config.force_reload_programs,
-        programs_cache=config.programs_json,
-        last_fetched_file=config.last_run_file,
-    )
+    programs = RUVClient().get_all_programs()
     found_programs: Programs = {}
     for pattern in patterns:
         found_programs.update(get_all_programs_by_pattern(programs, pattern, config.ignore_case))
+    found_programs = RUVClient().get_program_episodes(program_ids=list(p["programID"] for p in found_programs.values()))
     return found_programs
 
 
@@ -69,7 +67,7 @@ def download_program(
     downloaded_episodes: List[EpisodeDownload] = []
     skipped_episodes: List[EpisodeDownload] = []
     try:
-        selected_programs = RUVClient().get_program_episodes(program_ids=list(program_ids))
+        selected_programs = RUVClient().get_program_episodes(program_ids=[int(p) for p in program_ids])
     except KeyError:
         log.error("Invalid program id(s): " + ", ".join(program_ids))
         return downloaded_episodes, skipped_episodes
@@ -107,12 +105,12 @@ def download_program(
     return downloaded_episodes, skipped_episodes
 
 
-def organize(shows: List[Path], config: Config):
+def organize(shows: List[Path], config: Config) -> Dict[str, str]:
     """
     Organize shows into seasons and directories. A best effort approach.
     """
     translations = read_translations(config.translations)
-    _organize(
+    return _organize(
         episodes_to_organize=shows,
         destination_dir=config.organization_dest_dir,
         translations=translations,
@@ -126,8 +124,8 @@ def details(program_ids: Tuple[str, ...], config: Config) -> str:
     """
     if len(program_ids) == 0:
         return ""
-    
-    programs = RUVClient().get_program_episodes(program_ids=list(program_ids))
+
+    programs = RUVClient().get_program_episodes(program_ids=[int(p) for p in program_ids])
     rows = []
     for program_id in program_ids:
         program = programs[program_id]

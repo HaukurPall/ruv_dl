@@ -3,7 +3,7 @@ import urllib.parse
 import httpx
 
 
-def construct_categories_url(category_type):
+def construct_categories_url(category_type: str):
     base_url = "https://spilari.nyr.ruv.is/gql/"
     operation_name = "getCategories"
 
@@ -13,7 +13,7 @@ def construct_categories_url(category_type):
         {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "5a28b209a1a593a9f98e30d460718cba16f657b534b42c14fdcd5196bd39cdf9",
+                "sha256Hash": "7d5f9d18d22e7820e095abdce0d97f0bd516e14e0925748cd75ac937d98703db",
             }
         }
     )
@@ -50,7 +50,7 @@ def construct_categories_url(category_type):
 # }
 
 
-def construct_category_url(category, station):
+def construct_category_url(category: str, station: str):
     base_url = "https://spilari.nyr.ruv.is/gql/"
     operation_name = "getCategory"
 
@@ -60,16 +60,14 @@ def construct_category_url(category, station):
         {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "4d04a20dcfe37d6ec064299abb82895802d51bfa8bdd1ff283b64478cb2a2328",
+                "sha256Hash": "6ef244edfc897f95aabd1f915d58264329bb64ee498ae8df359ca0fa14c2278a",
             }
         }
     )
-
     query_params = {"operationName": operation_name, "variables": variables, "extensions": extensions}
 
     encoded_query_params = urllib.parse.urlencode(query_params)
     full_url = f"{base_url}?{encoded_query_params}"
-
     return full_url
 
 
@@ -106,7 +104,7 @@ def construct_category_url(category, station):
 base_url = "https://spilari.nyr.ruv.is/gql/"
 
 
-def construct_serie_url(episode_id, program_id):
+def construct_serie_url(episode_id: str, program_id: int):
     operation_name = "getSerie"
 
     variables = json.dumps({"episodeID": [episode_id], "programID": program_id})
@@ -164,7 +162,7 @@ def construct_serie_url(episode_id, program_id):
 # }
 
 
-def construct_episode_url(program_id):
+def construct_episode_url(program_id: int):
     base_url = "https://spilari.nyr.ruv.is/gql/"
     operation_name = "getEpisode"
 
@@ -174,11 +172,10 @@ def construct_episode_url(program_id):
         {
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "f3f957a3a577be001eccf93a76cf2ae1b6d10c95e67305c56e4273279115bb93",
+                "sha256Hash": "3c1f5cfa93253b4aabd0f1023be91a30d36ef0acc0d3356aac445d9e005b97f8",
             }
         }
     )
-
     query_params = {"operationName": operation_name, "variables": variables, "extensions": extensions}
 
     encoded_query_params = urllib.parse.urlencode(query_params)
@@ -216,8 +213,23 @@ def construct_episode_url(program_id):
 # }
 
 if __name__ == "__main__":
-    episode_id = "a6t3sd"
-    program_id = 34279
-    url = construct_serie_url(episode_id, program_id)
+    category_type = "tv"
+    url = construct_categories_url(category_type)
     print(url)
-    print(httpx.get(url).json())
+    response = httpx.get(url)
+    print(response.json())
+    # category = "born"
+    # station = "tv"
+    # url = construct_category_url(category, station)
+    # print(url)
+    # response = httpx.get(url)
+    # print(response.json())
+    # episode_id = "a6t3sd"
+    # program_id = 34279
+    # url = construct_serie_url(episode_id, program_id)
+    # print(url)
+    # print(httpx.get(url).json())
+
+    # url = construct_episode_url(33467)
+    # print(url)
+    # print(httpx.get(url).json())

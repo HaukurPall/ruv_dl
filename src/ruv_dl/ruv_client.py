@@ -24,6 +24,7 @@ class Episode(TypedDict):
 class Program(TypedDict):
     """A single program"""
 
+    programID: int
     id: str
     title: str
     foreign_title: Optional[str]
@@ -41,140 +42,57 @@ class Category(TypedDict):
 Programs = Dict[str, Program]
 
 
-async def get_tv_categories(client) -> list[Category]:
-    response = await client.get()
+async def get_tv_categories(client, category_type="tv") -> list[Category]:
+    log.debug(f"Fetching categories: category_type={category_type}")
+    get_categories_url = construct_categories_url(category_type=category_type)
+    log.debug(get_categories_url)
+    response = await client.get(get_categories_url)
     response.raise_for_status()
-    return response.json()["data"]["Category"]["categories"]
+    json_response = response.json()
+    if "error" in json_response:
+        log.warning("Error fetching categories: %s", json_response["error"])
+        return []
+    return json_response["data"]["Category"]["categories"]
 
 
-async def get_tv_category(client, slug: str) -> list[Program]:
-    get_category_url = f"https://spilari.nyr.ruv.is/gql/?operationName=getCategory&variables=%7B%22category%22%3A%22{slug}%22%2C%22station%22%3A%22tv%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%224d04a20dcfe37d6ec064299abb82895802d51bfa8bdd1ff283b64478cb2a2328%22%7D%7D"
-    # Returns a Category with a list of programs, each program has little information and a single episode.
-    # Example:
-    # {
-    #     "data": {
-    #         "Category": {
-    #             "categories": [
-    #                 {
-    #                     "title": "Fréttatengt efni",
-    #                     "slug": "frettatengt-efni",
-    #                     "programs": [
-    #                         {
-    #                             "short_description": null,
-    #                             "episodes": [
-    #                                 {
-    #                                     "id": "ahptvh",
-    #                                     "title": "05.02.2024",
-    #                                     "rating": 0,
-    #                                     "__typename": "Episode"
-    #                                 }
-    #                             ],
-    #                             "title": "Kastljós",
-    #                             "portrait_image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9wb3J0cmFpdF9wb3N0ZXJzL2FocHR2MC0yMG1hMDAuanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTAwMCwgImhlaWdodCI6IDE1MDB9fX0=",
-    #                             "id": 35422,
-    #                             "slug": "kastljos",
-    #                             "image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9oZF9wb3N0ZXJzL2FocHR2MC1namdyNmcuanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTkyMCwgImhlaWdodCI6IDEwODB9fX0=",
-    #                             "__typename": "Program"
-    #                         },
-    #                         ...
+async def get_tv_category(client, slug: str, category_type="tv") -> list[Program]:
+    log.debug(f"Fetching category: slug={slug}, category_type={category_type}")
+    get_category_url = construct_category_url(slug, station=category_type)
+    log.debug(get_category_url)
     response = await client.get(get_category_url)
     response.raise_for_status()
-    return response.json()["data"]["Category"]["categories"][0]["programs"]
+    json_response = response.json()
+    if "error" in json_response:
+        log.warning("Error fetching category: %s", json_response["error"])
+        return []
+    return json_response["data"]["Category"]["categories"][0]["programs"]
 
 
-async def get_episode(client, program_id: str, episode_id: str) -> Program:
-    def construct_serie_url(episode_id, program_id):
-        operation_name = "getSerie"
-
-        variables = json.dumps({"episodeID": [episode_id], "programID": program_id})
-        extensions = json.dumps(
-            {
-                "persistedQuery": {
-                    "version": 1,
-                    "sha256Hash": "afd9cf0c67f1ebed0a981b72ee127a5a152eb90f4adb2b3bd3e6c1ec185a2dd3",
-                }
-            }
-        )
-
-        query_params = {"operationName": operation_name, "variables": variables, "extensions": extensions}
-
-        encoded_query_params = urllib.parse.urlencode(query_params)
-        full_url = f"{base_url}?{encoded_query_params}"
-
-        return full_url
-
-    # Returns a Program with a single episode, each episode detailed information and file url.
-    # Example:
-    # {
-    #     "data": {
-    #         "Program": {
-    #             "slug": "aevintyri-halldors-gylfasonar",
-    #             "title": "Ævintýri Halldórs Gylfasonar",
-    #             "description": "Halldór Gylfason segir sígild ævintýri og leikur jafnframt öll hlutverkin.",
-    #             "short_description": null,
-    #             "foreign_title": null,
-    #             "format": "tv",
-    #             "id": 26322,
-    #             "image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9oZF9wb3N0ZXJzLzdyMHFwMC1ub2JyNGcuanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTkyMCwgImhlaWdodCI6IDEwODB9fX0=",
-    #             "episodes": [
-    #                 {
-    #                     "title": "Garðabrúða - seinni hluti",
-    #                     "id": "7r0qq7",
-    #                     "description": "Halldór Gylfason leikur öll hlutverk í þessu sígilda ævintýri um stúlkuna sem var með svo sítt hár að hún gat notað það sem reipi til að fá draumaprinsinn sinn í heimsókn upp í turnherbergið sem hún var fangi í.",
-    #                     "duration": 300,
-    #                     "firstrun": "2018-01-18T17:29:00",
-    #                     "scope": "Global",
-    #                     "file": "https://ruv-vod.akamaized.net/opid/5228824A1/5228824A1.m3u8",
-    #                     "rating": 0,
-    #                     "file_expires": "2025-12-31",
-    #                     "cards": [],
-    #                     "clips": [],
-    #                     "image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9oZF9wb3N0ZXJzLzdyMHFxNy1kZDRrYW8uanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTkyMCwgImhlaWdodCI6IDEwODB9fX0=",
-    #                     "subtitles": [],
-    #                     "__typename": "Episode"
-    #                 }
-    #             ],
-    #             "__typename": "Program"
-    #         }
-    #     }
-    # }
-    response = await client.get(construct_serie_url(episode_id, program_id))
+async def get_episode(client, program_id: int, episode_id: str) -> Program | None:
+    log.debug(f"Fetching episode: program_id={program_id}, episode_id={episode_id}")
+    get_serie_url = construct_serie_url(episode_id, program_id)
+    log.debug(get_serie_url)
+    response = await client.get(get_serie_url)
     response.raise_for_status()
-    return response.json()["data"]["Program"]
+    json_response = response.json()
+    if "error" in json_response:
+        log.warning("Error fetching episode: %s", json_response["error"])
+        return None
+    return json_response["data"]["Program"]
 
 
-async def get_program_episodes(client, program_id: str) -> Program:
-    get_episode_url = f"https://spilari.nyr.ruv.is/gql/?operationName=getEpisode&variables=%7B%22programID%22%3A{program_id}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22f3f957a3a577be001eccf93a76cf2ae1b6d10c95e67305c56e4273279115bb93%22%7D%7D"
-    # Returns a Program with a list of episodes, each episode has basic information and no file url.
-    # Example:
-    # {
-    #     "data": {
-    #         "Program": {
-    #             "slug": "aevintyri-halldors-gylfasonar",
-    #             "title": "Ævintýri Halldórs Gylfasonar",
-    #             "description": "Halldór Gylfason segir sígild ævintýri og leikur jafnframt öll hlutverkin.",
-    #             "short_description": null,
-    #             "foreign_title": null,
-    #             "id": 26322,
-    #             "image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9oZF9wb3N0ZXJzLzdyMHFwMC1ub2JyNGcuanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTkyMCwgImhlaWdodCI6IDEwODB9fX0=",
-    #             "episodes": [
-    #                 {
-    #                     "title": "Garðabrúða - seinni hluti",
-    #                     "id": "7r0qq7",
-    #                     "firstrun": "2018-01-18T17:29:00",
-    #                     "description": "Halldór Gylfason leikur öll hlutverk í þessu sígilda ævintýri um stúlkuna sem var með svo sítt hár að hún gat notað það sem reipi til að fá draumaprinsinn sinn í heimsókn upp í turnherbergið sem hún var fangi í.",
-    #                     "image": "https://myndir.ruv.is/eyJidWNrZXQiOiAicnV2LXByb2QtcnV2aXMtcHVibGljIiwgImtleSI6ICJtZWRpYS9wdWJsaWMvS3JpbmdsdW15bmRpci9oZF9wb3N0ZXJzLzdyMHFxNy1kZDRrYW8uanBnIiwgImVkaXRzIjogeyJyZXNpemUiOiB7IndpZHRoIjogMTkyMCwgImhlaWdodCI6IDEwODB9fX0=",
-    #                     "__typename": "Episode"
-    #                 },
-    #                 ...,
-    #             ],
-    #             "__typename": "Program"
-    #         }
-    #     }
-    # }
+async def get_program_episodes(client, program_id: int) -> Program | None:
+    """Fetch a program with all its episodes. The episode's 'file' property will be missing"""
+    log.debug(f"Fetching program: program_id={program_id}")
+    get_episode_url = construct_episode_url(program_id)
+    log.debug(get_episode_url)
     response = await client.get(get_episode_url)
     response.raise_for_status()
-    return response.json()["data"]["Program"]
+    json_response = response.json()
+    if "error" in json_response:
+        log.warning("Error fetching program: %s", json_response["error"])
+        return None
+    return json_response["data"]["Program"]
 
 
 class RUVClient:
@@ -192,44 +110,50 @@ class RUVClient:
         """Return a list of all programs without episodes."""
         async with httpx.AsyncClient() as client:
             categories = await get_tv_categories(client)
+            log.debug(f"Found {len(categories)} categories")
             programs = await asyncio.gather(*[get_tv_category(client, category["slug"]) for category in categories])
             return [program for program_list in programs for program in program_list]
 
     @staticmethod
-    async def _query_program_episodes(program_id: str) -> Program:
+    async def _query_program_episodes(program_id: int) -> Program | None:
         """Return a list of specified programs with episodes."""
         async with httpx.AsyncClient() as client:
             # first we fetch the program - this will give us all the episode ids
             # but we are still missing the file urls
             program = await get_program_episodes(client, program_id)
+            if program is None:
+                return None
+            log.debug(f"Found {len(program['episodes'])} episodes for program {program_id}")
             # then we fetch each episode to get the file urls
             programs_with_single_episode = await asyncio.gather(
-                *[get_episode(client, program_id, episode["id"]) for episode in program["episodes"]]
+                *[get_episode(client, program_id, episode["id"]) for episode in program["episodes"] if episode]
             )
             program["episodes"] = [
                 program_with_single_episode["episodes"][0]
                 for program_with_single_episode in programs_with_single_episode
+                if program_with_single_episode
             ]
             return program
 
     async def _get_all_programs(self) -> Programs:
         """Return a list of all programs without episodes."""
         programs = await self._query_all_programs()
+        log.info(f"Found {len(programs)} programs")
         return {program["id"]: program for program in programs}
 
-    async def _get_program_episodes(self, program_ids: List[str]) -> Dict[str, Program]:
-        """Return a list of specified programs with episodes."""
+    async def _get_program_episodes(self, program_ids: List[int]) -> Dict[str, Program]:
+        """Return the programs with all their episodes."""
         list_of_programs = await asyncio.gather(
             *[self._query_program_episodes(program_id) for program_id in program_ids]
         )
-        return {program["id"]: program for program in list_of_programs}
+        return {program["id"]: program for program in list_of_programs if program}
 
     def get_all_programs(self) -> Programs:
-        """Get all programs from ruv.is."""
+        """Get all programs from ruv.is. This does not contain all the episodes."""
         return asyncio.run(self._get_all_programs())
 
-    def get_program_episodes(self, program_ids: List[str]) -> Dict[str, Program]:
-        """Get episodes for a list of programs."""
+    def get_program_episodes(self, program_ids: List[int]) -> Dict[str, Program]:
+        """Get all the episodes for a list of programs."""
         return asyncio.run(self._get_program_episodes(program_ids))
 
 

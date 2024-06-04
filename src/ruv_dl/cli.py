@@ -12,7 +12,7 @@ from ruv_dl import main
 from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT
 from ruv_dl.ruv_client import Programs
 
-log = logging.getLogger("ruvsarpur")
+log = logging.getLogger("ruv_dl")
 
 CONFIG = main.Config()
 
@@ -34,7 +34,7 @@ def cli(work_dir: Path, log_level):
     CONFIG = main.Config(work_dir)
     CONFIG.initialize_dirs()
 
-    log.setLevel(logging.INFO)
+    log.setLevel(log_level)
     formatter = logging.Formatter("%(asctime)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
     stdout_handler = logging.StreamHandler(sys.stderr)
@@ -42,7 +42,7 @@ def cli(work_dir: Path, log_level):
     stdout_handler.setFormatter(formatter)
 
     file_handler = RotatingFileHandler(CONFIG.run_log, maxBytes=10000, backupCount=1)
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(log_level)
     file_handler.setFormatter(formatter)
 
     log.addHandler(file_handler)
@@ -124,7 +124,8 @@ def organize(shows: List[str], dry_run: bool):
     Please note that the show number is from RÚV and is often wrong.
     """
     CONFIG.dry_run = dry_run
-    click.echo(main.organize([Path(show) for show in shows], config=CONFIG))
+    for path_old, path_new in main.organize([Path(show) for show in shows], config=CONFIG).items():
+        click.echo(f"{path_old} -> {path_new}")
 
 
 @cli.command()
