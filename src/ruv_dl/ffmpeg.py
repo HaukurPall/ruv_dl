@@ -7,8 +7,11 @@ from typing import List, Optional, Tuple
 import ffpb
 from tqdm import tqdm
 
-QUALITIES_INT_TO_STR = {0: "1080p", 1: "720p", 2: "480p"}
-QUALITIES_STR_TO_INT = {value: key for key, value in QUALITIES_INT_TO_STR.items()}
+QUALITIES_STR = ["1080p", "720p", "480p"]
+
+
+def qualities_str_to_int(quality_str: str) -> int:
+    return int(quality_str[:-1])
 
 
 def download_m3u8_file(m3u8_url: str, stream_num: int, output_file: Path) -> bool:
@@ -51,9 +54,13 @@ def split_mp4_in_two(file_path: Path, split_at_time_sec: str, first_chunk: Path,
 def _create_integrity_check_ffmpeg_command(file_path: Path) -> List[str]:
     return [
         # fmt: off
-        "-i", str(file_path),
-        "-map", "0:1",
-        "-f", "null", "-"
+        "-i",
+        str(file_path),
+        "-map",
+        "0:1",
+        "-f",
+        "null",
+        "-",
         # fmt: on
     ]
 
@@ -62,13 +69,18 @@ def _create_ffmpeg_download_command(url: str, stream_num: int, output_file: Path
     """Create the ffmpeg command required to download a specific stream from a m3u8 playlist."""
     return [
         # fmt: off
-        "-i", url,
-        "-map", f"0:v:{stream_num}",  # First input file, select stream_num from video streams
-        "-map", f"0:a:{stream_num}",  # Same for audio
-        "-codec", "copy",  # No re-encoding
+        "-i",
+        url,
+        "-map",
+        f"0:v:{stream_num}",  # First input file, select stream_num from video streams
+        "-map",
+        f"0:a:{stream_num}",  # Same for audio
+        "-codec",
+        "copy",  # No re-encoding
         # This last line does nothing, since subtitles are burnt in.
-        "-codec:s", "srt",  # Except for subtitles due to some caveats in ffmpeg subtitle handling.
-        str(output_file)
+        "-codec:s",
+        "srt",  # Except for subtitles due to some caveats in ffmpeg subtitle handling.
+        str(output_file),
         # fmt: on
     ]
 
@@ -98,19 +110,26 @@ def _create_ffmpeg_split_command(
     if duration_sec is None:
         return [
             # fmt: off
-            "-i", str(filepath),
-            "-ss", str(start_time_sec),  # Accurate seek
-            "-c", "copy",  # Copy the encoding
-            str(output)
+            "-i",
+            str(filepath),
+            "-ss",
+            str(start_time_sec),  # Accurate seek
+            "-c",
+            "copy",  # Copy the encoding
+            str(output),
             # fmt: on
         ]
     # From timestamp to duration
     return [
         # fmt: off
-        "-i", str(filepath),
-        "-ss", str(start_time_sec), # Accurate seek
-        "-t", str(duration_sec),
-        "-c", "copy", # Copy the encoding
-        str(output)
+        "-i",
+        str(filepath),
+        "-ss",
+        str(start_time_sec),  # Accurate seek
+        "-t",
+        str(duration_sec),
+        "-c",
+        "copy",  # Copy the encoding
+        str(output),
         # fmt: on
     ]

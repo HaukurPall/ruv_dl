@@ -9,7 +9,7 @@ import click
 from tabulate import tabulate
 
 from ruv_dl import main
-from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT
+from ruv_dl.ffmpeg import QUALITIES_STR
 from ruv_dl.ruv_client import Programs
 
 log = logging.getLogger("ruv_dl")
@@ -91,7 +91,7 @@ def maybe_read_stdin(_ctx, _param, value):
     help="""The quality of the file to download.
 The default value, when not supplied, is 1080p.
 """,
-    type=click.Choice(list(QUALITIES_STR_TO_INT.keys())),
+    type=click.Choice(QUALITIES_STR),
     default=CONFIG.quality,
 )
 @click.option(

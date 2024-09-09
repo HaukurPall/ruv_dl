@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
 
-from .ruv_urls import construct_categories_url, construct_category_url, construct_serie_url, construct_episode_url
-
 import httpx
+
+from .ruv_urls import construct_categories_url, construct_category_url, construct_episode_url, construct_serie_url
 
 log = logging.getLogger(__name__)
 
@@ -49,8 +49,12 @@ async def get_tv_categories(client, category_type="tv") -> list[Category]:
     response = await client.get(get_categories_url)
     response.raise_for_status()
     json_response = response.json()
+    log.debug(json_response)
     if "error" in json_response:
         log.warning("Error fetching categories: %s", json_response["error"])
+        return []
+    if "data" not in json_response:
+        log.warning("No data in response: %s", json_response)
         return []
     return json_response["data"]["Category"]["categories"]
 
@@ -65,6 +69,9 @@ async def get_tv_category(client, slug: str, category_type="tv") -> list[Program
     if "error" in json_response:
         log.warning("Error fetching category: %s", json_response["error"])
         return []
+    if "data" not in json_response:
+        log.warning("No data in response: %s", json_response)
+        return []
     return json_response["data"]["Category"]["categories"][0]["programs"]
 
 
@@ -77,6 +84,9 @@ async def get_episode(client, program_id: int, episode_id: str) -> Program | Non
     json_response = response.json()
     if "error" in json_response:
         log.warning("Error fetching episode: %s", json_response["error"])
+        return None
+    if "data" not in json_response:
+        log.warning("No data in response: %s", json_response)
         return None
     return json_response["data"]["Program"]
 

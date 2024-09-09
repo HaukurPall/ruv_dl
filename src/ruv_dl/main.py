@@ -4,11 +4,12 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
+import m3u8
 from tabulate import tabulate
 from tqdm import tqdm
 
 from ruv_dl import ffmpeg
-from ruv_dl.ffmpeg import QUALITIES_STR_TO_INT, check_mp4_integrity, download_m3u8_file
+from ruv_dl.ffmpeg import check_mp4_integrity, download_m3u8_file, qualities_str_to_int
 from ruv_dl.hls_downloader import load_m3u8_available_resolutions
 from ruv_dl.organize import _guess_show_num
 from ruv_dl.organize import organize as _organize
@@ -94,7 +95,18 @@ def download_program(
                 skipped_episodes.append(episode)
                 append_downloaded_episode(config.download_log, episode)
 
-            if download_m3u8_file(episode.url, QUALITIES_STR_TO_INT[episode.quality_str], output_file=output_file):
+            m3u8_playlist = m3u8.load(episode.url)
+            stream_num = -1
+            for idx, playlist in enumerate(m3u8_playlist.playlists):
+                log.debug(playlist.stream_info.resolution)
+                # the resolution is a tuple of (width, height)
+                if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
+                    stream_num = idx
+                    break
+            if stream_num == -1:
+                log.error(f"Unable to find stream with resolution {episode.quality_str}")
+                continue
+            if download_m3u8_file(episode.url, stream_num=stream_num, output_file=output_file):
                 downloaded_episodes.append(episode)
                 append_downloaded_episode(config.download_log, episode)
             else:
