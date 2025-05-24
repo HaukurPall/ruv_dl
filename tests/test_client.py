@@ -1,5 +1,3 @@
-from tkinter import W
-
 from ruv_dl import ruv_client
 
 
