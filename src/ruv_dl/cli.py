@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 from itertools import chain
@@ -69,7 +70,7 @@ def search(patterns: Tuple[str, ...], ignore_case: bool, only_ids: bool, force_r
     CONFIG.ignore_case = ignore_case
     CONFIG.only_ids = only_ids
     CONFIG.force_reload_programs = force_reload_programs
-    found_programs = main.search(patterns=patterns, config=CONFIG)
+    found_programs = asyncio.run(main.search(patterns=patterns, config=CONFIG))
     if CONFIG.only_ids:
         return click.echo(" ".join([str(id) for id in found_programs]))
     headers, rows = program_results(found_programs)
@@ -104,7 +105,7 @@ def download_program(program_ids: Tuple[str, ...], quality: str, force_reload_pr
     Use the 'search' functionality with --only-ids to get them and pipe them to this command."""
     CONFIG.quality = quality
     CONFIG.force_reload_programs = force_reload_programs
-    downloaded_episodes, skipped_episodes = main.download_program(program_ids=program_ids, config=CONFIG)
+    downloaded_episodes, skipped_episodes = asyncio.run(main.download_program(program_ids=program_ids, config=CONFIG))
     if len(downloaded_episodes) == 0 and len(skipped_episodes) == 0:
         click.echo("No episodes downloaded.")
     click.echo("\n".join(episode.file_name() for episode in chain(downloaded_episodes, skipped_episodes)))
@@ -138,7 +139,7 @@ def organize(shows: List[str], dry_run: bool):
 def details(program_ids: Tuple[str, ...], force_reload_programs: bool):
     """Get the details of all the episodes of the supplied program ids. Can be multiple."""
     CONFIG.force_reload_programs = force_reload_programs
-    click.echo(main.details(program_ids, config=CONFIG))
+    click.echo(asyncio.run(main.details(program_ids, config=CONFIG)))
 
 
 @cli.command()

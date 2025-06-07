@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest>=7.1.1,<8.0.0"]
+dev = ["ruff", "pytest>=7.1.1,<8.0.0", "pytest-asyncio"]
 
 [project.urls]
 Repository = "https://github.com/HaukurPall/ruv-dl"
@@ -29,9 +29,13 @@ Repository = "https://github.com/HaukurPall/ruv-dl"
 [project.scripts]
 ruv-dl = "ruv_dl.cli:cli"
 
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.black]
 line-length = 120
+
+[tool.pyright]
+reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

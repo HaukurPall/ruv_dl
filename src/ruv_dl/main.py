@@ -48,19 +48,22 @@ class Config:
             self.organization_dest_dir.mkdir(parents=True, exist_ok=True)
 
 
-def search(patterns: Tuple[str, ...], config: Config) -> Programs:
+async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
     """Search for a RÚV program based on the patterns provided.
     Is limited to main title only.
     Either returns a human readable table with the program results or a string of program ids found."""
-    programs = RUVClient().get_all_programs()
-    found_programs: Programs = {}
-    for pattern in patterns:
-        found_programs.update(get_all_programs_by_pattern(programs, pattern, config.ignore_case))
-    found_programs = RUVClient().get_program_episodes(program_ids=list(p["programID"] for p in found_programs.values()))
+    async with RUVClient() as client:
+        programs = await client.get_all_programs()
+        found_programs: Programs = {}
+        for pattern in patterns:
+            found_programs.update(get_all_programs_by_pattern(programs, pattern, config.ignore_case))
+        found_programs = await client.get_programs_with_episodes(
+            program_ids=list(p["programID"] for p in found_programs.values())
+        )
     return found_programs
 
 
-def download_program(
+async def download_program(
     program_ids: Tuple[str, ...], config: Config
 ) -> Tuple[List[EpisodeDownload], List[EpisodeDownload]]:
     """Download all episodes (not previously downloaded) of the supplied program ids (plural).
@@ -68,7 +71,8 @@ def download_program(
     downloaded_episodes: List[EpisodeDownload] = []
     skipped_episodes: List[EpisodeDownload] = []
     try:
-        selected_programs = RUVClient().get_program_episodes(program_ids=[int(p) for p in program_ids])
+        async with RUVClient() as client:
+            selected_programs = await client.get_programs_with_episodes(program_ids=[int(p) for p in program_ids])
     except KeyError:
         log.error("Invalid program id(s): " + ", ".join(program_ids))
         return downloaded_episodes, skipped_episodes
@@ -130,17 +134,28 @@ def organize(shows: List[Path], config: Config) -> Dict[str, str]:
     )
 
 
-def details(program_ids: Tuple[str, ...], config: Config) -> str:
+async def details(program_ids: Tuple[str, ...], config: Config) -> str:
     """
     Get detailed information about a program's episodes.
     """
     if len(program_ids) == 0:
         return ""
 
-    programs = RUVClient().get_program_episodes(program_ids=[int(p) for p in program_ids])
+    async with RUVClient() as client:
+        programs = await client.get_programs_with_episodes(program_ids=[int(p) for p in program_ids])
     rows = []
     for program_id in program_ids:
-        program = programs[program_id]
+        # Find the program by matching the programID field
+        program = None
+        for prog in programs.values():
+            if str(prog.get("id", "")) == program_id or str(prog.get("programID", "")) == program_id:
+                program = prog
+                break
+
+        if program is None:
+            log.warning(f"Program {program_id} not found in results")
+            continue
+
         p_headers, p_rows = program_details(program)
         rows.extend(p_rows)
 
