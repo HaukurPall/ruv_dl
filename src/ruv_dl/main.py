@@ -84,7 +84,15 @@ async def download_program(
     episodes_to_download = filter_downloaded_episodes(
         downloaded_episodes=previously_downloaded_episodes, episodes_to_download=selected_episodes
     )
+
+    # Track episodes that were already downloaded and add them to skipped_episodes
+    already_downloaded_episodes = [ep for ep in selected_episodes if ep not in episodes_to_download]
+    skipped_episodes.extend(already_downloaded_episodes)
+
     log.info(f"Will download {len(episodes_to_download)} episodes")
+    if already_downloaded_episodes:
+        log.info(f"Skipping {len(already_downloaded_episodes)} episodes that were already downloaded")
+
     tqdm_iter = tqdm(episodes_to_download)
     try:
         for episode in tqdm_iter:
@@ -96,6 +104,7 @@ async def download_program(
             if check_file_validity(output_file):
                 skipped_episodes.append(episode)
                 append_downloaded_episode(config.download_log, episode)
+                continue
 
             m3u8_playlist = m3u8.load(episode.url)
             stream_num = -1
