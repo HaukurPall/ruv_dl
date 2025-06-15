@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
 import m3u8
-from tabulate import tabulate
 from tqdm import tqdm
 
 from ruv_dl import ffmpeg
@@ -29,7 +28,6 @@ class Config:
         self.download_dir = work_dir / "downloads"
         self.programs_json = work_dir / "programs.json"
         self.download_log = work_dir / "downloaded.jsonl"
-        self.run_log = work_dir / "debug.log"
         self.translations = work_dir / "translations.json"
         self.last_run_file = work_dir / "programs_last_fetched.txt"
         self.ignore_case = False
@@ -134,32 +132,34 @@ def organize(shows: List[Path], config: Config) -> Dict[str, str]:
     )
 
 
-async def details(program_ids: Tuple[str, ...], config: Config) -> str:
+async def details(program_ids: Tuple[str, ...], config: Config) -> Programs:
     """
-    Get detailed information about a program's episodes.
+    Get detailed information about programs and their episodes.
+    Returns a dictionary of Program data (Programs type).
     """
-    if len(program_ids) == 0:
-        return ""
+    if not program_ids:
+        log.info("No program IDs provided to details function.")
+        return {}
 
+    valid_program_ids_int: List[int] = []
+    for pid_str in program_ids:
+        if pid_str.isdigit():
+            valid_program_ids_int.append(int(pid_str))
+        else:
+            log.warning(f"Invalid program ID format: '{pid_str}'. Will be skipped.")
+
+    if not valid_program_ids_int:
+        log.warning("No valid program IDs remaining after filtering.")
+        return {}
+
+    log.info(f"Fetching details for program IDs: {valid_program_ids_int}")
     async with RUVClient() as client:
-        programs = await client.get_programs_with_episodes(program_ids=[int(p) for p in program_ids])
-    rows = []
-    for program_id in program_ids:
-        # Find the program by matching the programID field
-        program = None
-        for prog in programs.values():
-            if str(prog.get("id", "")) == program_id or str(prog.get("programID", "")) == program_id:
-                program = prog
-                break
+        programs_data: Programs = await client.get_programs_with_episodes(program_ids=valid_program_ids_int)
 
-        if program is None:
-            log.warning(f"Program {program_id} not found in results")
-            continue
+    if not programs_data:
+        log.info(f"No program data found for IDs: {valid_program_ids_int}")
 
-        p_headers, p_rows = program_details(program)
-        rows.extend(p_rows)
-
-    return tabulate(tabular_data=rows, headers=p_headers, tablefmt="github")  # type: ignore
+    return programs_data
 
 
 def split_episode(file_path: Path, timestamp: str) -> Optional[Tuple[Path, Path]]:
@@ -180,35 +180,6 @@ def split_episode(file_path: Path, timestamp: str) -> Optional[Tuple[Path, Path]
         return first_file, second_file
     else:
         return None
-
-
-def program_details(program: Program) -> Tuple[List[str], List[List[str]]]:
-    header = [
-        "Program title",
-        "Foreign title",
-        "Title",
-        "Program ID",
-        "Episode ID",
-        "Short description",
-        "Qualities",
-        "URL",
-    ]
-    rows = []
-    for episode in program["episodes"]:
-        resolutions = load_m3u8_available_resolutions(episode["file"])
-        rows.append(
-            [
-                program["title"],
-                program["foreign_title"],
-                episode["title"],
-                program["id"],
-                episode["id"],
-                program["short_description"],
-                "/".join(str(res) + "p" for _, res in resolutions),
-                episode["file"],
-            ]
-        )
-    return header, rows
 
 
 def check_file_validity(file_path: Path) -> bool:

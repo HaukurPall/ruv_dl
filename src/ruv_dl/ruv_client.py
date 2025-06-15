@@ -13,11 +13,13 @@ log = logging.getLogger(__name__)
 
 class RUVAPIError(Exception):
     """Raised when RÚV API returns an error"""
+
     pass
 
 
 class PersistedQueryNotFoundError(RUVAPIError):
     """Raised when RÚV API returns PersistedQueryNotFound error"""
+
     def __init__(self, operation_name: str, url: str, response_data: dict):
         self.operation_name = operation_name
         self.url = url
@@ -30,6 +32,7 @@ class PersistedQueryNotFoundError(RUVAPIError):
 
 class Episode(TypedDict):
     """A single episode"""
+
     id: str
     title: str
     file: str
@@ -38,6 +41,7 @@ class Episode(TypedDict):
 
 class Program(TypedDict):
     """A single program"""
+
     programID: int
     id: str
     title: str
@@ -48,6 +52,7 @@ class Program(TypedDict):
 
 class Category(TypedDict):
     """A single category"""
+
     title: str
     slug: str
 
@@ -57,9 +62,9 @@ Programs = Dict[str, Program]
 
 class RUVClient:
     """A simple HTTP client for RÚV's GraphQL API"""
-    
+
     BASE_URL = "https://spilari.nyr.ruv.is/gql/"
-    
+
     # GraphQL query hashes (these may need updating when RÚV changes their API)
     QUERY_HASHES = {
         "getCategories": "7d5f9d18d22e7820e095abdce0d97f0bd516e14e0925748cd75ac937d98703db",
@@ -67,12 +72,14 @@ class RUVClient:
         # "getSerie": "afd9cf0c67f1ebed0a981b72ee127a5a152eb90f4adb2b3bd3e6c1ec185a2dd3", # Operation removed
         "getEpisode": "3c1f5cfa93253b4aabd0f1023be91a30d36ef0acc0d3356aac445d9e005b97f8",
     }
-    
+
     def __init__(self) -> None:
         self.headers = {
             "content-type": "application/json",
             "Referer": "https://www.ruv.is/sjonvarp",
             "Origin": "https://www.ruv.is",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
         }
         self.client = None
 
@@ -87,19 +94,24 @@ class RUVClient:
     def _build_persisted_query_url(self, operation: str, variables: dict) -> str:
         """Build a GET URL for persisted GraphQL queries"""
         # Use separators to remove spaces and manually encode to match browser format
-        variables_json = json.dumps(variables, separators=(',', ':'))
-        extensions_json = json.dumps({
-            "persistedQuery": {
-                "version": 1,
-                "sha256Hash": self.QUERY_HASHES[operation],
-            }
-        }, separators=(',', ':'))
-        
+        variables_json = json.dumps(variables, separators=(",", ":"))
+        extensions_json = json.dumps(
+            {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": self.QUERY_HASHES[operation],
+                }
+            },
+            separators=(",", ":"),
+        )
+
         # Manually build query string to avoid unwanted encoding
         encoded_variables = urllib.parse.quote(variables_json)
         encoded_extensions = urllib.parse.quote(extensions_json)
-        
-        return f"{self.BASE_URL}?operationName={operation}&variables={encoded_variables}&extensions={encoded_extensions}"
+
+        return (
+            f"{self.BASE_URL}?operationName={operation}&variables={encoded_variables}&extensions={encoded_extensions}"
+        )
 
     def _handle_response(self, response_data: dict, operation: str, url: str) -> dict:
         """Handle GraphQL response errors"""
@@ -108,36 +120,32 @@ class RUVClient:
                 if error.get("extensions", {}).get("code") == "PERSISTED_QUERY_NOT_FOUND":
                     raise PersistedQueryNotFoundError(operation, url, response_data)
             raise RUVAPIError(f"GraphQL error in {operation}: {response_data['errors']}")
-        
+
         if "data" not in response_data:
             raise RUVAPIError(f"No data in {operation} response: {response_data}")
-        
+
         return response_data["data"]
 
     async def _query_get(self, operation: str, variables: dict) -> dict:
         """Execute a GET request with persisted query"""
         url = self._build_persisted_query_url(operation, variables)
         log.debug(f"GET {operation}: {url}")
-        
+
         response = await self.client.get(url)
         response.raise_for_status()
         response_data = response.json()
-        
+
         return self._handle_response(response_data, operation, url)
 
     async def _query_post(self, operation: str, variables: dict, query: str) -> dict:
         """Execute a POST request with full GraphQL query"""
-        payload = {
-            "operationName": operation,
-            "variables": variables,
-            "query": query
-        }
-        
+        payload = {"operationName": operation, "variables": variables, "query": query}
+
         log.debug(f"POST {operation}: {variables}")
         response = await self.client.post(self.BASE_URL, json=payload)
         response.raise_for_status()
         response_data = response.json()
-        
+
         return self._handle_response(response_data, operation, self.BASE_URL)
 
     async def _query_with_fallback(self, operation: str, variables: dict, fallback_query: str) -> dict:
@@ -183,37 +191,34 @@ class RUVClient:
           }
         }
         """
-        
+
         variables = {"programID": program_id}
         # Use _query_post directly to ensure we use the updated query structure
         # and get all required fields, bypassing potential GET cache with old structure.
         data = await self._query_post("getEpisode", variables, query)
         return data["Program"]
 
-    # Removed get_episode_details as its functionality is merged into get_program_episodes
-
     async def get_all_programs(self) -> Programs:
         """Get all programs from RÚV (without detailed episode info)"""
         log.info("Fetching all categories...")
         categories = await self.get_categories()
         log.debug(f"Found {len(categories)} categories")
-        
+
         log.info("Fetching programs from all categories...")
-        category_programs = await asyncio.gather(*[
-            self.get_category_programs(category["slug"]) 
-            for category in categories
-        ])
-        
+        category_programs = await asyncio.gather(
+            *[self.get_category_programs(category["slug"]) for category in categories]
+        )
+
         # Flatten the list of lists and convert to dict
         all_programs = [program for programs in category_programs for program in programs]
         log.info(f"Found {len(all_programs)} total programs")
-        
+
         return {program["id"]: program for program in all_programs}
 
     async def get_programs_with_episodes(self, program_ids: List[int]) -> Programs:
         """Get detailed program info with file URLs for episodes"""
         log.info(f"Fetching detailed program and episode info for {len(program_ids)} programs...")
-        
+
         fetched_programs: list[Program] = []
         for program_id in program_ids:
             # get_program_episodes now fetches all required details, including file URLs
@@ -223,13 +228,9 @@ class RUVClient:
                 fetched_programs.append(program)
             else:
                 log.warning(f"Could not fetch program ID {program_id}.")
-        
+
         # Ensure 'id' exists in program objects before creating the dictionary
-        return {
-            prog["id"]: prog for prog in fetched_programs if prog and "id" in prog
-        }
-
-
+        return {prog["id"]: prog for prog in fetched_programs if prog and "id" in prog}
 
 
 # Utility functions for caching
@@ -261,22 +262,19 @@ def save_last_fetched(file_path: Path):
 
 
 async def load_programs(
-    force_reload: bool, 
-    programs_cache: Path, 
-    last_fetched_file: Path, 
-    refresh_interval_sec: int = 10 * 60
+    force_reload: bool, programs_cache: Path, last_fetched_file: Path, refresh_interval_sec: int = 10 * 60
 ) -> Programs:
     """Load programs from cache or fetch from API if needed"""
     last_fetched = load_last_fetched(last_fetched_file)
     should_fetch = force_reload
-    
+
     if not should_fetch and last_fetched is None:
         log.info("No previous fetch timestamp found")
         should_fetch = True
     elif not should_fetch and last_fetched + timedelta(seconds=refresh_interval_sec) < datetime.now():
         log.info("Cache is stale, refreshing...")
         should_fetch = True
-    
+
     if should_fetch:
         async with RUVClient() as client:
             programs = await client.get_all_programs()
@@ -293,5 +291,5 @@ async def load_programs(
             save_programs_cache(programs_cache, programs)
             save_last_fetched(last_fetched_file)
             log.info(f"Cache not found, fetched {len(programs)} programs")
-    
+
     return programs
