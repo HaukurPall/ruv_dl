@@ -59,8 +59,6 @@ As a side-effect, some files are generated in the **current working directory** 
 
 - `downloads/` folder, contains the downloaded files
 - `organized/` folder, explained in the [organize](##organize) section.
-- `programs.json` file, contains information about all the programs fetched
-- `programs_last_fetched.txt` file, a timestamp for when we fetched the `programs.json`
 - `debug.log` file, logging information from the program
 - `downloaded.jsonl` file, contains information about the programs downloaded
 
@@ -87,7 +85,6 @@ The search command takes the following options:
 
 - `--ignore-case`: Ignore case when searching.
 - `--only-ids`: Only output the program ids found, not a nice table. This is useful for piping the ids to the next command.
-- `--force-reload-programs`: Force reloading the `programs.json` file. By default, it is reloaded if it is older than 10 minutes.
 
 An example usage of searching using multiple search terms and `--ignore-case`:
 
@@ -108,9 +105,6 @@ ruv-dl search "hvolpa" "sámur" "skotti" "lestrarhvutti" "úmísúmí" "kúlu" "
 | Hrúturinn Hreinn: Björgun Teits |                           |               1 |        32509 | Hreinn og vinir hans leggjast í leiðangu |
 ```
 
-The search command stores the programs found in the `programs.json` file and writes a timestamp to the `programs_last_fetched.txt` file.
-The timestamp is read before querying the graphql API to avoid querying the graphql API if the programs.json file is newer than 10 minutes.
-
 ## `download-program`
 
 The download command is used to download all missing episodes of a program into `downloads/`.
@@ -118,7 +112,6 @@ It takes program ids as arguments.
 
 It takes the following options:
 
-- `--force-reload-programs`: Force reloading the `programs.json` file. By default, it is reloaded if it is older than 10 minutes.
 - `--quality`: The video quality to download. By default, it is `1080p`, but you can also use `720p`, `480p`, `360p` and `240p`.
 
 The easiest way to download programs is to append `--only-ids` to the `search` command and pipe it to the `download-program` command:

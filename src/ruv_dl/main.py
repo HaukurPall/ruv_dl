@@ -27,13 +27,10 @@ class Config:
         self.work_dir = work_dir
         self.organization_dest_dir = work_dir / "organized"
         self.download_dir = work_dir / "downloads"
-        self.programs_json = work_dir / "programs.json"
         self.download_log = work_dir / "downloaded.jsonl"
         self.translations = work_dir / "translations.json"
-        self.last_run_file = work_dir / "programs_last_fetched.txt"
         self.ignore_case = False
         self.only_ids = False
-        self.force_reload_programs = False
         self.quality: str = "1080p"
         self.dry_run = False
 

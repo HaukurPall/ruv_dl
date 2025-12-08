@@ -75,16 +75,10 @@ def search(
         "--only-ids/--no-only-ids",
         help="Only return the found program IDs (space separated).",
     ),
-    force_reload_programs: bool = typer.Option(
-        False,
-        "--force-reload-programs/--no-force-reload-programs",
-        help="Force reloading the program list from RUV.",
-    ),
 ):
     """Search for programs based on the supplied PATTERNS."""
     CONFIG.ignore_case = ignore_case
     CONFIG.only_ids = only_ids
-    CONFIG.force_reload_programs = force_reload_programs
     found_programs = asyncio.run(main.search(tuple(patterns), config=CONFIG))
 
     if not found_programs:
@@ -117,11 +111,6 @@ def download_program(
         help=f"The quality of the file to download. Choices: {', '.join(QUALITIES_STR)}.",
         case_sensitive=False,
     ),
-    force_reload_programs: bool = typer.Option(
-        False,  # Default from main.Config
-        "--force-reload-programs/--no-force-reload-programs",
-        help="Force reloading the program list.",
-    ),
 ):
     """Download all episodes of the supplied program IDs."""
     actual_program_ids: List[str] = []
@@ -143,7 +132,6 @@ def download_program(
         raise typer.Exit(code=1)
 
     CONFIG.quality = quality
-    CONFIG.force_reload_programs = force_reload_programs
 
     console.print(f"Attempting to download programs: {', '.join(actual_program_ids)} with quality: {quality}")
 
@@ -205,11 +193,6 @@ def details(
     program_ids: Optional[List[str]] = typer.Argument(
         None, help="Program IDs to get details for. Reads from stdin if not provided."
     ),
-    force_reload_programs: bool = typer.Option(
-        False,  # Default from main.Config
-        "--force-reload-programs/--no-force-reload-programs",
-        help="Force reloading the program list.",
-    ),
 ):
     """Get and display details for episodes of the supplied program IDs."""
     actual_program_ids: List[str] = []
@@ -223,8 +206,6 @@ def details(
     if not actual_program_ids:
         console.print("[bold red]Error: No program IDs provided via arguments or stdin.[/bold red]")
         raise typer.Exit(code=1)
-
-    CONFIG.force_reload_programs = force_reload_programs
 
     # main.details now returns Programs (Dict[int, ProgramDict])
     programs_data: Programs = asyncio.run(main.details(tuple(actual_program_ids), config=CONFIG))
@@ -301,16 +282,8 @@ def details(
 
 
 @app.command(hidden=True)
-def fetch_subtitled_programs(
-    force_reload_programs: bool = typer.Option(
-        False,
-        "--force-reload-programs/--no-force-reload-programs",
-        help="Force reloading the program list.",
-    ),
-):
+def fetch_subtitled_programs():
     """Fetch all programs that have subtitles."""
-    CONFIG.force_reload_programs = force_reload_programs
-
     console.print("[cyan]Fetching all programs and checking for subtitles...[/cyan]")
     programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
 

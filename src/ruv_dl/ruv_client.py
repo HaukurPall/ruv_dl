@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 import urllib.parse
-from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
 
 import httpx
@@ -248,68 +246,3 @@ class RUVClient:
 
         # Ensure 'id' exists in program objects before creating the dictionary
         return {prog["id"]: prog for prog in fetched_programs if prog and "id" in prog}
-
-
-# Utility functions for caching
-def save_programs_cache(file_path: Path, programs: Programs):
-    """Save programs to cache file"""
-    with file_path.open("w", encoding="utf-8") as f:
-        json.dump(programs, f, ensure_ascii=False)
-
-
-def load_programs_cache(file_path: Path) -> Programs:
-    """Load programs from cache file"""
-    with file_path.open("r") as f:
-        return json.load(f)
-
-
-def load_last_fetched(file_path: Path) -> Optional[datetime]:
-    """Load the timestamp of last fetch"""
-    if file_path.exists():
-        with file_path.open() as f:
-            date_time_str = f.read().strip()
-            return datetime.fromisoformat(date_time_str)
-    return None
-
-
-def save_last_fetched(file_path: Path):
-    """Save the current timestamp"""
-    with file_path.open("w") as f:
-        f.write(datetime.now().isoformat())
-
-
-async def load_programs(
-    force_reload: bool,
-    programs_cache: Path,
-    last_fetched_file: Path,
-    refresh_interval_sec: int = 10 * 60,
-) -> Programs:
-    """Load programs from cache or fetch from API if needed"""
-    last_fetched = load_last_fetched(last_fetched_file)
-    should_fetch = force_reload
-
-    if not should_fetch and last_fetched is None:
-        log.info("No previous fetch timestamp found")
-        should_fetch = True
-    elif not should_fetch and last_fetched + timedelta(seconds=refresh_interval_sec) < datetime.now():
-        log.info("Cache is stale, refreshing...")
-        should_fetch = True
-
-    if should_fetch:
-        async with RUVClient() as client:
-            programs = await client.get_all_programs()
-        save_programs_cache(programs_cache, programs)
-        save_last_fetched(last_fetched_file)
-        log.info(f"Fetched and cached {len(programs)} programs")
-    else:
-        try:
-            programs = load_programs_cache(programs_cache)
-            log.info(f"Loaded {len(programs)} programs from cache")
-        except FileNotFoundError:
-            async with RUVClient() as client:
-                programs = await client.get_all_programs()
-            save_programs_cache(programs_cache, programs)
-            save_last_fetched(last_fetched_file)
-            log.info(f"Cache not found, fetched {len(programs)} programs")
-
-    return programs
