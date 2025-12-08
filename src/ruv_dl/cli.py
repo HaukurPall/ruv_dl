@@ -71,7 +71,9 @@ def search(
     patterns: List[str] = typer.Argument(..., help="Pattern(s) to search for in program titles."),
     ignore_case: bool = typer.Option(True, "--ignore-case/--no-ignore-case", help="Ignore casing when searching."),
     only_ids: bool = typer.Option(
-        False, "--only-ids/--no-only-ids", help="Only return the found program IDs (space separated)."
+        False,
+        "--only-ids/--no-only-ids",
+        help="Only return the found program IDs (space separated).",
     ),
     force_reload_programs: bool = typer.Option(
         False,
@@ -246,7 +248,9 @@ def details(
             continue
 
         episode_table = Table(
-            title=f"Episodes for {program_details_dict.get('title', 'N/A')}", show_header=True, header_style="bold blue"
+            title=f"Episodes for {program_details_dict.get('title', 'N/A')}",
+            show_header=True,
+            header_style="bold blue",
         )
         episode_table.add_column("Episode Title", style="dim", width=40)
         episode_table.add_column("Episode ID")
@@ -286,9 +290,60 @@ def details(
             file_url = episode.get("file", "N/A")
 
             episode_table.add_row(
-                episode_title, episode_id, published_date, duration, available_qualities_str, file_url
+                episode_title,
+                episode_id,
+                published_date,
+                duration,
+                available_qualities_str,
+                file_url,
             )
         console.print(episode_table)
+
+
+@app.command(hidden=True)
+def fetch_subtitled_programs(
+    force_reload_programs: bool = typer.Option(
+        False,
+        "--force-reload-programs/--no-force-reload-programs",
+        help="Force reloading the program list.",
+    ),
+):
+    """Fetch all programs that have subtitles."""
+    CONFIG.force_reload_programs = force_reload_programs
+
+    console.print("[cyan]Fetching all programs and checking for subtitles...[/cyan]")
+    programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
+
+    total_episodes = 0
+    episodes_with_subtitles = 0
+    programs_with_subtitles = 0
+
+    for program_id_key, program_details_dict in programs_data.items():
+        episodes = program_details_dict.get("episodes", [])
+        has_subtitles = False
+        for episode in episodes:
+            total_episodes += 1
+            # Check if episode has subtitles
+            subtitles = episode.get("subtitles", [])
+            closed_subtitles = episode.get("closed_subtitles", False)
+            open_subtitles = episode.get("open_subtitles", False)
+            auto_subtitles = episode.get("auto_subtitles", False)
+
+            if subtitles or closed_subtitles or open_subtitles or auto_subtitles:
+                episodes_with_subtitles += 1
+                has_subtitles = True
+
+        if has_subtitles:
+            programs_with_subtitles += 1
+            console.print(
+                f"[green]Found subtitles in:[/green] {program_details_dict.get('title')} (ID: {program_details_dict.get('id')})"
+            )
+
+    console.print(
+        f"\n[bold green]Summary:[/bold green]\n"
+        f"Programs with subtitles: {programs_with_subtitles}\n"
+        f"Episodes with subtitles: {episodes_with_subtitles} / {total_episodes}"
+    )
 
 
 @app.command()
@@ -326,7 +381,13 @@ ProgramHeader = Tuple[str, str, str, str, str]
 
 def program_results(programs: Programs) -> Tuple[ProgramHeader, List[ProgramRow]]:
     """Format the program results for printing."""
-    header = ("Program title", "Foreign title", "Episode count", "Program ID", "Short description")
+    header = (
+        "Program title",
+        "Foreign title",
+        "Episode count",
+        "Program ID",
+        "Short description",
+    )
     rows = []
     for program_id_key, program_content in programs.items():
         try:

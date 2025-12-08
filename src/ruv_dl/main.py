@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
+import httpx
 import m3u8
 from tqdm import tqdm
 
@@ -82,7 +83,8 @@ async def download_program(
     ]
     previously_downloaded_episodes = read_downloaded_episodes(config.download_log)
     episodes_to_download = filter_downloaded_episodes(
-        downloaded_episodes=previously_downloaded_episodes, episodes_to_download=selected_episodes
+        downloaded_episodes=previously_downloaded_episodes,
+        episodes_to_download=selected_episodes,
     )
 
     # Track episodes that were already downloaded and add them to skipped_episodes
@@ -117,11 +119,33 @@ async def download_program(
             if stream_num == -1:
                 log.error(f"Unable to find stream with resolution {episode.quality_str}")
                 continue
-            if download_m3u8_file(episode.url, stream_num=stream_num, output_file=output_file):
+
+            subtitle_file = None
+            if episode.subtitle_url:
+                subtitle_path = config.download_dir / f"{episode.file_name()}.vtt"
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(episode.subtitle_url)
+                        response.raise_for_status()
+                        with open(subtitle_path, "w", encoding="utf-8") as f:
+                            f.write(response.text)
+                    subtitle_file = subtitle_path
+                except Exception as e:
+                    log.error(f"Failed to download subtitle from {episode.subtitle_url}: {e}")
+
+            if download_m3u8_file(
+                episode.url,
+                stream_num=stream_num,
+                output_file=output_file,
+                subtitle_file=subtitle_file,
+            ):
                 downloaded_episodes.append(episode)
                 append_downloaded_episode(config.download_log, episode)
             else:
                 log.error(f"Unable to download m3u8. Check the url with ffmpeg: {episode.url}")
+
+            if subtitle_file and subtitle_file.exists():
+                subtitle_file.unlink()
 
     except KeyboardInterrupt:
         log.warning("Stopping.")
@@ -167,6 +191,21 @@ async def details(program_ids: Tuple[str, ...], config: Config) -> Programs:
 
     if not programs_data:
         log.info(f"No program data found for IDs: {valid_program_ids_int}")
+
+    return programs_data
+
+
+async def find_all_subtitles(config: Config) -> Programs:
+    """
+    Get all programs with detailed episode information including subtitle data.
+    Returns a dictionary of Program data (Programs type).
+    """
+    log.info("Fetching all programs...")
+    async with RUVClient() as client:
+        all_programs = await client.get_all_programs()
+        program_ids = [p["programID"] for p in all_programs.values()]
+        log.info(f"Fetching episode details for {len(program_ids)} programs...")
+        programs_data: Programs = await client.get_programs_with_episodes(program_ids=program_ids)
 
     return programs_data
 

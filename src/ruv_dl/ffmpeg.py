@@ -14,9 +14,21 @@ def qualities_str_to_int(quality_str: str) -> int:
     return int(quality_str[:-1])
 
 
-def download_m3u8_file(m3u8_url: str, stream_num: int, output_file: Path) -> bool:
-    ffmpeg_command = _create_ffmpeg_download_command(m3u8_url, stream_num, output_file=output_file)
-    retval = ffpb.main(argv=ffmpeg_command, stream=sys.stderr, encoding="utf-8", tqdm=partial(tqdm, leave=False))
+def download_m3u8_file(
+    m3u8_url: str,
+    stream_num: int,
+    output_file: Path,
+    subtitle_file: Optional[Path] = None,
+) -> bool:
+    ffmpeg_command = _create_ffmpeg_download_command(
+        m3u8_url, stream_num, output_file=output_file, subtitle_file=subtitle_file
+    )
+    retval = ffpb.main(
+        argv=ffmpeg_command,
+        stream=sys.stderr,
+        encoding="utf-8",
+        tqdm=partial(tqdm, leave=False),
+    )
     if retval != 0:
         if output_file.exists():
             output_file.unlink()
@@ -28,7 +40,12 @@ def download_m3u8_file(m3u8_url: str, stream_num: int, output_file: Path) -> boo
 
 def check_mp4_integrity(file_path: Path) -> bool:
     ffmpeg_command = _create_integrity_check_ffmpeg_command(file_path)
-    retval = ffpb.main(argv=ffmpeg_command, stream=sys.stderr, encoding="utf-8", tqdm=partial(tqdm, leave=False))
+    retval = ffpb.main(
+        argv=ffmpeg_command,
+        stream=sys.stderr,
+        encoding="utf-8",
+        tqdm=partial(tqdm, leave=False),
+    )
     if retval != 0:
         file_path.unlink()
         if retval == signal.SIGINT + 128:
@@ -40,10 +57,18 @@ def check_mp4_integrity(file_path: Path) -> bool:
 def split_mp4_in_two(file_path: Path, split_at_time_sec: str, first_chunk: Path, second_chunk: Path) -> bool:
     """Split an mp4 file into two files at the given time."""
     commands = _create_ffmpeg_split_in_two_commands(
-        file_path, split_at_time_sec=split_at_time_sec, first_chunk=first_chunk, second_chunk=second_chunk
+        file_path,
+        split_at_time_sec=split_at_time_sec,
+        first_chunk=first_chunk,
+        second_chunk=second_chunk,
     )
     for command in commands:
-        retval = ffpb.main(argv=command, stream=sys.stderr, encoding="utf-8", tqdm=partial(tqdm, leave=False))
+        retval = ffpb.main(
+            argv=command,
+            stream=sys.stderr,
+            encoding="utf-8",
+            tqdm=partial(tqdm, leave=False),
+        )
         if retval != 0:
             if retval == signal.SIGINT + 128:
                 raise KeyboardInterrupt
@@ -65,24 +90,42 @@ def _create_integrity_check_ffmpeg_command(file_path: Path) -> List[str]:
     ]
 
 
-def _create_ffmpeg_download_command(url: str, stream_num: int, output_file: Path):
+def _create_ffmpeg_download_command(url: str, stream_num: int, output_file: Path, subtitle_file: Optional[Path] = None):
     """Create the ffmpeg command required to download a specific stream from a m3u8 playlist."""
-    return [
+    cmd = [
         # fmt: off
         "-i",
         url,
-        "-map",
-        f"0:v:{stream_num}",  # First input file, select stream_num from video streams
-        "-map",
-        f"0:a:{stream_num}",  # Same for audio
-        "-codec",
-        "copy",  # No re-encoding
-        # This last line does nothing, since subtitles are burnt in.
-        "-codec:s",
-        "srt",  # Except for subtitles due to some caveats in ffmpeg subtitle handling.
-        str(output_file),
-        # fmt: on
     ]
+    if subtitle_file:
+        cmd.extend(["-i", str(subtitle_file)])
+
+    cmd.extend(
+        [
+            "-map",
+            f"0:v:{stream_num}",  # First input file, select stream_num from video streams
+            "-map",
+            f"0:a:{stream_num}",  # Same for audio
+        ]
+    )
+
+    if subtitle_file:
+        cmd.extend(["-map", "1:0"])
+
+    cmd.extend(
+        [
+            "-c:v",
+            "copy",
+            "-c:a",
+            "copy",
+        ]
+    )
+
+    if subtitle_file:
+        cmd.extend(["-c:s", "mov_text", "-metadata:s:s:0", "language=isl"])
+
+    cmd.append(str(output_file))
+    return cmd
 
 
 def _create_ffmpeg_split_in_two_commands(
@@ -90,10 +133,16 @@ def _create_ffmpeg_split_in_two_commands(
 ) -> Tuple[List[str], List[str]]:
     return (
         _create_ffmpeg_split_command(
-            filepath=filepath, start_time_sec="00:00", duration_sec=split_at_time_sec, output=first_chunk
+            filepath=filepath,
+            start_time_sec="00:00",
+            duration_sec=split_at_time_sec,
+            output=first_chunk,
         ),
         _create_ffmpeg_split_command(
-            filepath=filepath, start_time_sec=split_at_time_sec, duration_sec=None, output=second_chunk
+            filepath=filepath,
+            start_time_sec=split_at_time_sec,
+            duration_sec=None,
+            output=second_chunk,
         ),
     )
 

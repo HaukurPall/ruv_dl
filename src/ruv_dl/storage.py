@@ -17,9 +17,22 @@ class EpisodeDownload:
     quality_str: str
     url: str
     firstrun: Optional[str] = None
+    subtitle_url: Optional[str] = None
 
     @staticmethod
     def from_episode_and_program(episode: Episode, program: Program, quality: str) -> "EpisodeDownload":
+        subtitle_url = None
+        subtitles = episode.get("subtitles", [])
+        if subtitles:
+            # Prefer Icelandic subtitles
+            for sub in subtitles:
+                if sub.get("name") == "is":
+                    subtitle_url = sub.get("value")
+                    break
+            # Fallback to the first available subtitle if 'is' not found
+            if subtitle_url is None and len(subtitles) > 0:
+                subtitle_url = subtitles[0].get("value")
+
         return EpisodeDownload(
             id=episode["id"],
             program_id=program["id"],
@@ -29,6 +42,7 @@ class EpisodeDownload:
             quality_str=quality,
             url=episode["file"],
             firstrun=episode["firstrun"],
+            subtitle_url=subtitle_url,
         )
 
     @staticmethod
@@ -50,7 +64,8 @@ class EpisodeDownload:
 
 
 def filter_downloaded_episodes(
-    downloaded_episodes: List[EpisodeDownload], episodes_to_download: List[EpisodeDownload]
+    downloaded_episodes: List[EpisodeDownload],
+    episodes_to_download: List[EpisodeDownload],
 ) -> List[EpisodeDownload]:
     """Filter out episodes that are already downloaded.
 

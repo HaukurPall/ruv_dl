@@ -11,10 +11,10 @@ def load_m3u8_available_resolutions(url: str) -> List[Tuple[int, int]]:
     m3u8_obj = m3u8.load(url)
     if m3u8_obj.is_variant:
         resolutions = [playlist.stream_info.resolution for playlist in m3u8_obj.playlists]
-        assert resolutions == sorted(
-            resolutions
-        ), f"The resolutions are not sorted in {url}, they need to be \
+        assert resolutions == sorted(resolutions), (
+            f"The resolutions are not sorted in {url}, they need to be \
 so we can select the correct stream. Please post this error so it can be handled"
+        )
         return resolutions
 
     raise ValueError(

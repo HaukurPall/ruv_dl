@@ -30,6 +30,11 @@ class PersistedQueryNotFoundError(RUVAPIError):
         )
 
 
+class Subtitle(TypedDict):
+    name: str  # This is actually the language extension (is)
+    value: str  # This is a URL to the subtitle file
+
+
 class Episode(TypedDict):
     """A single episode"""
 
@@ -37,6 +42,10 @@ class Episode(TypedDict):
     title: str
     file: str
     firstrun: str  # 2009-01-01 22:10:00
+    subtitles: List[Subtitle]
+    open_subtitles: bool
+    closed_subtitles: bool
+    auto_subtitles: bool
 
 
 class Program(TypedDict):
@@ -187,6 +196,14 @@ class RUVClient:
               # image # Removed
               file # Added
               file_expires # Added
+              open_subtitles
+              closed_subtitles
+              auto_subtitles
+              subtitles {
+                __typename
+                name
+                value
+              }
             }
           }
         }
@@ -262,7 +279,10 @@ def save_last_fetched(file_path: Path):
 
 
 async def load_programs(
-    force_reload: bool, programs_cache: Path, last_fetched_file: Path, refresh_interval_sec: int = 10 * 60
+    force_reload: bool,
+    programs_cache: Path,
+    last_fetched_file: Path,
+    refresh_interval_sec: int = 10 * 60,
 ) -> Programs:
     """Load programs from cache or fetch from API if needed"""
     last_fetched = load_last_fetched(last_fetched_file)
