@@ -5,6 +5,7 @@ import urllib.parse
 from typing import Dict, List, Optional, TypedDict
 
 import httpx
+from tqdm import tqdm
 
 log = logging.getLogger(__name__)
 
@@ -230,19 +231,30 @@ class RUVClient:
 
         return {program["id"]: program for program in all_programs}
 
-    async def get_programs_with_episodes(self, program_ids: List[int]) -> Programs:
+    async def get_programs_with_episodes(self, program_ids: List[int], limit: int = 10) -> Programs:
         """Get detailed program info with file URLs for episodes"""
         log.info(f"Fetching detailed program and episode info for {len(program_ids)} programs...")
 
+        semaphore = asyncio.Semaphore(limit)
+
+        async def _fetch(pid: int) -> tuple[int, Optional[Program]]:
+            async with semaphore:
+                try:
+                    return pid, await self.get_program_episodes(pid)
+                except Exception as e:
+                    log.warning(f"Error fetching program ID {pid}: {e}")
+                    return pid, None
+
         fetched_programs: list[Program] = []
-        for program_id in program_ids:
-            # get_program_episodes now fetches all required details, including file URLs
-            program = await self.get_program_episodes(program_id)
+        tasks = [_fetch(pid) for pid in program_ids]
+
+        for coro in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Fetching programs details"):
+            pid, program = await coro
             if program:
-                log.debug(f"Successfully fetched program ID {program_id} with its episodes.")
+                log.debug(f"Successfully fetched program ID {pid} with its episodes.")
                 fetched_programs.append(program)
             else:
-                log.warning(f"Could not fetch program ID {program_id}.")
+                log.warning(f"Could not fetch program ID {pid}.")
 
         # Ensure 'id' exists in program objects before creating the dictionary
         return {prog["id"]: prog for prog in fetched_programs if prog and "id" in prog}

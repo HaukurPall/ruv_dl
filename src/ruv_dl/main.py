@@ -33,6 +33,7 @@ class Config:
         self.only_ids = False
         self.quality: str = "1080p"
         self.dry_run = False
+        self.max_concurrent_requests = 10
 
     def initialize_dirs(self):
         """Creates all necessary directories which the progam expects."""
@@ -54,7 +55,8 @@ async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
         for pattern in patterns:
             found_programs.update(get_all_programs_by_pattern(programs, pattern, config.ignore_case))
         found_programs = await client.get_programs_with_episodes(
-            program_ids=list(p["programID"] for p in found_programs.values())
+            program_ids=list(p["programID"] for p in found_programs.values()),
+            limit=config.max_concurrent_requests,
         )
     return found_programs
 
@@ -68,7 +70,10 @@ async def download_program(
     skipped_episodes: List[EpisodeDownload] = []
     try:
         async with RUVClient() as client:
-            selected_programs = await client.get_programs_with_episodes(program_ids=[int(p) for p in program_ids])
+            selected_programs = await client.get_programs_with_episodes(
+                program_ids=[int(p) for p in program_ids],
+                limit=config.max_concurrent_requests,
+            )
     except KeyError:
         log.error("Invalid program id(s): " + ", ".join(program_ids))
         return downloaded_episodes, skipped_episodes
@@ -184,7 +189,10 @@ async def details(program_ids: Tuple[str, ...], config: Config) -> Programs:
 
     log.info(f"Fetching details for program IDs: {valid_program_ids_int}")
     async with RUVClient() as client:
-        programs_data: Programs = await client.get_programs_with_episodes(program_ids=valid_program_ids_int)
+        programs_data: Programs = await client.get_programs_with_episodes(
+            program_ids=valid_program_ids_int,
+            limit=config.max_concurrent_requests,
+        )
 
     if not programs_data:
         log.info(f"No program data found for IDs: {valid_program_ids_int}")
@@ -202,7 +210,10 @@ async def find_all_subtitles(config: Config) -> Programs:
         all_programs = await client.get_all_programs()
         program_ids = [p["programID"] for p in all_programs.values()]
         log.info(f"Fetching episode details for {len(program_ids)} programs...")
-        programs_data: Programs = await client.get_programs_with_episodes(program_ids=program_ids)
+        programs_data: Programs = await client.get_programs_with_episodes(
+            program_ids=program_ids,
+            limit=config.max_concurrent_requests,
+        )
 
     return programs_data
 
