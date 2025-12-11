@@ -33,8 +33,6 @@ class Config:
             self.work_dir.mkdir(parents=True, exist_ok=True)
         if not self.download_dir.exists():
             self.download_dir.mkdir(parents=True, exist_ok=True)
-        if not self.organization_dest_dir.exists():
-            self.organization_dest_dir.mkdir(parents=True, exist_ok=True)
 
 
 async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
