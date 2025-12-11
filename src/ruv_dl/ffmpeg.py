@@ -1,3 +1,4 @@
+import shutil
 import signal
 import sys
 from functools import partial
@@ -6,6 +7,21 @@ from typing import List, Optional, Tuple
 
 import ffpb
 from tqdm import tqdm
+
+
+class FFmpegNotInstalledError(Exception):
+    """Raised when ffmpeg is not installed on the system."""
+
+    pass
+
+
+def _check_ffmpeg_installed() -> None:
+    """Check if ffmpeg is installed and raise FFmpegNotInstalledError if not."""
+    if shutil.which("ffmpeg") is None:
+        raise FFmpegNotInstalledError(
+            "ffmpeg is not installed or not found in PATH. Please install ffmpeg to use this functionality."
+        )
+
 
 QUALITIES_STR = ["1080p", "720p", "480p"]
 
@@ -20,6 +36,7 @@ def download_m3u8_file(
     output_file: Path,
     subtitle_file: Optional[Path] = None,
 ) -> bool:
+    _check_ffmpeg_installed()
     ffmpeg_command = _create_ffmpeg_download_command(
         m3u8_url, stream_num, output_file=output_file, subtitle_file=subtitle_file
     )
@@ -39,6 +56,7 @@ def download_m3u8_file(
 
 
 def check_mp4_integrity(file_path: Path) -> bool:
+    _check_ffmpeg_installed()
     ffmpeg_command = _create_integrity_check_ffmpeg_command(file_path)
     retval = ffpb.main(
         argv=ffmpeg_command,
@@ -56,6 +74,7 @@ def check_mp4_integrity(file_path: Path) -> bool:
 
 def split_mp4_in_two(file_path: Path, split_at_time_sec: str, first_chunk: Path, second_chunk: Path) -> bool:
     """Split an mp4 file into two files at the given time."""
+    _check_ffmpeg_installed()
     commands = _create_ffmpeg_split_in_two_commands(
         file_path,
         split_at_time_sec=split_at_time_sec,

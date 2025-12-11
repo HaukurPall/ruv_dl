@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ruv_dl import main
-from ruv_dl.ffmpeg import QUALITIES_STR
+from ruv_dl.ffmpeg import QUALITIES_STR, FFmpegNotInstalledError
 from ruv_dl.hls_downloader import load_m3u8_available_resolutions
 from ruv_dl.ruv_client import Programs
 
@@ -135,7 +135,13 @@ def download_program(
 
     console.print(f"Attempting to download programs: {', '.join(actual_program_ids)} with quality: {quality}")
 
-    downloaded_episodes, skipped_episodes = asyncio.run(main.download_program(tuple(actual_program_ids), config=CONFIG))
+    try:
+        downloaded_episodes, skipped_episodes = asyncio.run(
+            main.download_program(tuple(actual_program_ids), config=CONFIG)
+        )
+    except FFmpegNotInstalledError:
+        console.print("[bold red]Error: ffmpeg is not installed or not found in PATH.[/bold red]")
+        raise typer.Exit(code=1)
 
     if not downloaded_episodes and not skipped_episodes:
         console.print("[yellow]No episodes were downloaded or skipped. Check program IDs and availability.[/yellow]")
@@ -333,7 +339,12 @@ def split_episode(
 ):
     """Split an episode file into two based on the provided TIMESTAMP."""
     console.print(f"Attempting to split file: '{file_path}' at timestamp: {timestamp}")
-    result = main.split_episode(file_path, timestamp)
+    try:
+        result = main.split_episode(file_path, timestamp)
+    except FFmpegNotInstalledError:
+        console.print("[bold red]Error: ffmpeg is not installed or not found in PATH.[/bold red]")
+        raise typer.Exit(code=1)
+
     if result:
         console.print(f"[bold green]Successfully split '{file_path.name}'. New files created:[/bold green]")
         for path_item in result:
