@@ -273,7 +273,7 @@ def fetch_subtitled_programs(
     if not audio_only:
         CONFIG.quality = quality
     console.print("[cyan]Fetching all programs from RÚV (this may take a while)...[/cyan]")
-    programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
+    programs_data = asyncio.run(main.get_all_programs_with_episodes(config=CONFIG))
 
     console.print(f"[cyan]Analyzing {len(programs_data)} programs for subtitle information...[/cyan]\n")
 
@@ -281,12 +281,13 @@ def fetch_subtitled_programs(
     episodes_with_subtitles = 0
     programs_with_subtitles = 0
     total_programs_checked = 0
-    programs_to_download = []
+    episodes_to_download = []
 
     for program_id_key, program_details_dict in programs_data.items():
         total_programs_checked += 1
         episodes = program_details_dict.get("episodes", [])
-        has_subtitles = False
+        program_episodes_with_subtitles = []
+
         for episode in episodes:
             total_episodes += 1
             # Check if episode has subtitles
@@ -297,24 +298,22 @@ def fetch_subtitled_programs(
 
             if subtitles or closed_subtitles or open_subtitles or auto_subtitles:
                 episodes_with_subtitles += 1
-                has_subtitles = True
+                program_episodes_with_subtitles.append(episode)
 
-        if has_subtitles:
+        if program_episodes_with_subtitles:
             programs_with_subtitles += 1
             episode_count = len(episodes)
-            subtitle_count = sum(
-                1
-                for ep in episodes
-                if ep.get("subtitles")
-                or ep.get("closed_subtitles")
-                or ep.get("open_subtitles")
-                or ep.get("auto_subtitles")
-            )
+            subtitle_count = len(program_episodes_with_subtitles)
             console.print(
                 f"[green]✓[/green] {program_details_dict.get('title')} "
                 f"[dim](ID: {program_details_dict.get('id')}, {subtitle_count}/{episode_count} episodes)[/dim]"
             )
-            programs_to_download.append(program_details_dict)
+            # Convert episodes to EpisodeDownload objects and add to list
+            for episode in program_episodes_with_subtitles:
+                episode_download = main.EpisodeDownload.from_episode_and_program(
+                    episode, program_details_dict, CONFIG.quality
+                )
+                episodes_to_download.append(episode_download)
 
     console.print(
         f"\n[bold cyan]Analysis Summary:[/bold cyan]\n"
@@ -323,35 +322,20 @@ def fetch_subtitled_programs(
         f"Episodes with subtitles: {episodes_with_subtitles} / {total_episodes}\n"
     )
 
-    if not programs_to_download:
-        console.print("[yellow]No programs with subtitles found to download.[/yellow]")
+    if not episodes_to_download:
+        console.print("[yellow]No episodes with subtitles found to download.[/yellow]")
         return
 
-    console.print(f"\n[cyan]Starting download of {len(programs_to_download)} programs...[/cyan]\n")
+    console.print(f"\n[cyan]Starting download of {len(episodes_to_download)} episodes with subtitles...[/cyan]\n")
 
-    total_downloaded = 0
-    total_skipped = 0
-
-    for program in programs_to_download:
-        program_title = program.get("title", "Unknown")
-        console.print(f"[bold blue]Downloading:[/bold blue] {program_title}")
-
-        downloaded_episodes, skipped_episodes = asyncio.run(
-            main._download_episodes_from_programs(programs={program["id"]: program}, config=CONFIG)
-        )
-
-        total_downloaded += len(downloaded_episodes)
-        total_skipped += len(skipped_episodes)
-
-        if downloaded_episodes:
-            console.print(f"  [green]✓ Downloaded {len(downloaded_episodes)} episode(s)[/green]")
-        if skipped_episodes:
-            console.print(f"  [yellow]⊘ Skipped {len(skipped_episodes)} episode(s)[/yellow]")
+    downloaded_episodes, skipped_episodes = asyncio.run(
+        main._download_episodes(episodes=episodes_to_download, config=CONFIG)
+    )
 
     console.print(
         f"\n[bold green]Download Summary:[/bold green]\n"
-        f"Total episodes downloaded: {total_downloaded}\n"
-        f"Total episodes skipped: {total_skipped}"
+        f"Total episodes downloaded: {len(downloaded_episodes)}\n"
+        f"Total episodes skipped: {len(skipped_episodes)}"
     )
 
 

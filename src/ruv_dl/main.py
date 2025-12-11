@@ -52,27 +52,22 @@ async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
     return found_programs
 
 
-async def _download_episodes_from_programs(
-    programs: Programs, config: Config
+async def _download_episodes(
+    episodes: List[EpisodeDownload], config: Config
 ) -> Tuple[List[EpisodeDownload], List[EpisodeDownload]]:
-    """Download episodes from already-fetched programs.
+    """Download specific episodes.
     Returns tuple of (downloaded_episodes, skipped_episodes)."""
     downloaded_episodes: List[EpisodeDownload] = []
     skipped_episodes: List[EpisodeDownload] = []
 
-    selected_episodes = [
-        EpisodeDownload.from_episode_and_program(episode, program, config.quality)
-        for program in programs.values()
-        for episode in program["episodes"]
-    ]
     previously_downloaded_episodes = read_downloaded_episodes(config.download_log)
     episodes_to_download = filter_downloaded_episodes(
         downloaded_episodes=previously_downloaded_episodes,
-        episodes_to_download=selected_episodes,
+        episodes_to_download=episodes,
     )
 
     # Track episodes that were already downloaded and add them to skipped_episodes
-    already_downloaded_episodes = [ep for ep in selected_episodes if ep not in episodes_to_download]
+    already_downloaded_episodes = [ep for ep in episodes if ep not in episodes_to_download]
     skipped_episodes.extend(already_downloaded_episodes)
 
     log.info(f"Will download {len(episodes_to_download)} episodes")
@@ -147,6 +142,19 @@ async def _download_episodes_from_programs(
     return downloaded_episodes, skipped_episodes
 
 
+async def _download_episodes_from_programs(
+    programs: Programs, config: Config
+) -> Tuple[List[EpisodeDownload], List[EpisodeDownload]]:
+    """Download all episodes from already-fetched programs.
+    Returns tuple of (downloaded_episodes, skipped_episodes)."""
+    selected_episodes = [
+        EpisodeDownload.from_episode_and_program(episode, program, config.quality)
+        for program in programs.values()
+        for episode in program["episodes"]
+    ]
+    return await _download_episodes(selected_episodes, config)
+
+
 async def download_program(
     program_ids: Tuple[str, ...], config: Config
 ) -> Tuple[List[EpisodeDownload], List[EpisodeDownload]]:
@@ -198,9 +206,9 @@ async def details(program_ids: Tuple[str, ...], config: Config) -> Programs:
     return programs_data
 
 
-async def find_all_subtitles(config: Config) -> Programs:
+async def get_all_programs_with_episodes(config: Config) -> Programs:
     """
-    Get all programs with detailed episode information including subtitle data.
+    Get all programs with detailed episode information.
     Returns a dictionary of Program data (Programs type).
     """
     log.info("Fetching all programs...")
