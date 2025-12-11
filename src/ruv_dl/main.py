@@ -1,19 +1,13 @@
-import json
 import logging
-import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, cast
+from typing import List, Tuple, cast
 
 import httpx
 import m3u8
 from tqdm import tqdm
 
-from ruv_dl import ffmpeg
 from ruv_dl.ffmpeg import check_mp4_integrity, download_m3u8_file, qualities_str_to_int
-from ruv_dl.hls_downloader import load_m3u8_available_resolutions
-from ruv_dl.organize import _guess_show_num
-from ruv_dl.organize import organize as _organize
-from ruv_dl.ruv_client import Program, Programs, RUVClient
+from ruv_dl.ruv_client import Programs, RUVClient
 from ruv_dl.search import get_all_programs_by_pattern
 from ruv_dl.storage import EpisodeDownload, filter_downloaded_episodes
 
@@ -25,10 +19,8 @@ class Config:
 
     def __init__(self, work_dir: Path = Path.cwd()) -> None:
         self.work_dir = work_dir
-        self.organization_dest_dir = work_dir / "organized"
         self.download_dir = work_dir / "downloads"
         self.download_log = work_dir / "downloaded.jsonl"
-        self.translations = work_dir / "translations.json"
         self.ignore_case = False
         self.only_ids = False
         self.quality: str = "1080p"
@@ -154,19 +146,6 @@ async def download_program(
     return downloaded_episodes, skipped_episodes
 
 
-def organize(shows: List[Path], config: Config) -> Dict[str, str]:
-    """
-    Organize shows into seasons and directories. A best effort approach.
-    """
-    translations = read_translations(config.translations)
-    return _organize(
-        episodes_to_organize=shows,
-        destination_dir=config.organization_dest_dir,
-        translations=translations,
-        dry_run=config.dry_run,
-    )
-
-
 async def details(program_ids: Tuple[str, ...], config: Config) -> Programs:
     """
     Get detailed information about programs and their episodes.
@@ -218,38 +197,11 @@ async def find_all_subtitles(config: Config) -> Programs:
     return programs_data
 
 
-def split_episode(file_path: Path, timestamp: str) -> Optional[Tuple[Path, Path]]:
-    """Split an episode into two files, the first will have duration=timestamp.
-    The other starts=timestamp."""
-    first_file = file_path.with_suffix(".mp4.part1")
-    second_file = file_path.with_suffix(".mp4.part2")
-    # We check if the filename has EXX-EYY in it, we will use it.
-    filename = file_path.name
-    parent = file_path.parent
-    match = re.match(r".*(E\d+-E\d+).*", filename)
-    if match:
-        show_nums = _guess_show_num(match.group(1))
-        if show_nums is not None:
-            first_file = parent / filename.replace(match.group(1), f"E{show_nums[0]:02}")
-            second_file = parent / filename.replace(match.group(1), f"E{show_nums[1]:02}")
-    if ffmpeg.split_mp4_in_two(file_path, timestamp, first_file, second_file):
-        return first_file, second_file
-    else:
-        return None
-
-
 def check_file_validity(file_path: Path) -> bool:
     if not file_path.exists():
         return False
     # The file exists - check integrity
     return check_mp4_integrity(file_path)
-
-
-def read_translations(path: Path) -> Dict[str, str]:
-    if path.exists():
-        with path.open() as f:
-            return json.load(f)
-    return {}
 
 
 def read_downloaded_episodes(path: Path) -> List[EpisodeDownload]:

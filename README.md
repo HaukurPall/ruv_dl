@@ -29,6 +29,7 @@ The original plan was to fork that repo and improve upon it, but it was easier t
 
 ## Versions
 
+- 1.3.0: Removed `organize` and `split-episode` commands to simplify the codebase. Fixed intermittent `PersistedQueryNotFound` errors by switching from GET requests with persisted query hashes to POST requests with full GraphQL queries.
 - 1.2.0: Added support for subtitles. If subtitles are available they are downloaded and embedded into the video file. Large refactoring of the RÚV client.
 - 1.1.2: Fixed (silent - but deadly) error when downloading program list from RÚV, after RÚV updated. Reoccurring issues will still be silent which needs to be resolved later. Introduces a new approach to fetching programs and episodes from RÚV which is more efficient than the previous one.
 - 1.1.1: Fixed incorrect stream indexing (of quality) which resulted in a crash and incorrect video quality, after RÚV updated.
@@ -58,7 +59,6 @@ This will:
 As a side-effect, some files are generated in the **current working directory** in process:
 
 - `downloads/` folder, contains the downloaded files
-- `organized/` folder, explained in the [organize](##organize) section.
 - `debug.log` file, logging information from the program
 - `downloaded.jsonl` file, contains information about the programs downloaded
 
@@ -141,69 +141,7 @@ This file contains information about the episodes downloaded and is used to avoi
 If you want to re-download all episodes, you can delete the `downloaded.jsonl` file and run the `download-program` command again.
 If you want to re-download a single episodes, you can find the corresponding line in the file and delete it and run the `download-program` command again.
 
-## `organize` and the `organized/` folder
 
-Understood by Plex
-Assumes TV shows and season 1 and "þáttur x af y"
-
-### Incorrect episodes numbers in RÚV
-
-### Missing foreign titles - `translations.json`
-
-## `details`
-
-TODO
-
-## Scheduling the `ruv-dl` command
-
-TODO: Explain scheduling
-
-### Linux
-
-```bash
-~/.config/systemd/user/dl_ruv.service
-#
-[Unit]
-Description=Download content from RÚV
-
-[Service]
-Type=simple
-ExecStart=%HOME/Projects/ruv-dl/fetch_all.fish
-
-[Install]
-WantedBy=default.target
-
-~/.config/systemd/user/dl_ruv.timer
-#
-[Unit]
-Description=Schedule RÚV content downloading
-
-[Timer]
-#Execute job if it missed a run due to machine being off
-Persistent=true
-OnCalendar=daily
-#File describing job to execute
-Unit=dl_ruv.service
-
-[Install]
-WantedBy=timers.target
-```
-
-systemctl --user start dl_ruv
-systemctl --user status dl_ruv
-
-systemctl --user start dl_ruv.timer
-systemctl --user status dl_ruv.timer
-
-journalctl --user -S today -u dl_ruv
-systemctl --user enable dl_ruv.timer
-
-https://opensource.com/article/20/7/systemd-timers
-https://fedoramagazine.org/systemd-timers-for-scheduling-tasks/
-
-## Sending a telegram message
-
-TODO
 
 ## Development
 
@@ -215,12 +153,7 @@ Check the `debug.log` file for more information and/or increase the `--log-level
 
 The `debug.log` file is rotated, so it will not grow indefinitely.
 
-### Planned features
 
-- Handling of mp3 downloading.
-- `check` command to check if mp4 files are ok on demand.
-- `split` command to split a mp4 file into two different files based on a timestamp.
-- Add support for checking downloaded episodes which are no longer available.
 
 ### `schema.graphql`
 

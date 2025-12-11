@@ -157,44 +157,6 @@ def download_program(
 
 
 @app.command()
-def organize(
-    shows_paths: List[Path] = typer.Argument(
-        ...,  # Ellipsis means it's required
-        help="Paths to show directories or files to organize.",
-        exists=True,  # Typer will check if path exists
-        file_okay=True,
-        dir_okay=True,
-        resolve_path=True,  # Converts to absolute path
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run/--no-dry-run",
-        help="Mimic organization without moving files.",  # Default from main.Config
-    ),
-):
-    """Organize SHOWS into a 'Title/Season X/filename' structure."""
-    CONFIG.dry_run = dry_run
-
-    console.print(f"Organizing shows/files: {[str(p) for p in shows_paths]}")
-    if dry_run:
-        console.print("[yellow]Dry run enabled. No files will be moved.[/yellow]")
-
-    organized_items = main.organize(shows_paths, config=CONFIG)
-
-    if not organized_items:
-        console.print("[yellow]No files were organized.[/yellow]")
-        return
-
-    table = Table(title="File Organization Summary", show_header=True, header_style="bold blue")
-    table.add_column("Original Path", style="dim cyan")
-    table.add_column("New Path", style="green")
-
-    for path_old, path_new in organized_items.items():
-        table.add_row(str(path_old), str(path_new))
-    console.print(table)
-
-
-@app.command()
 def details(
     program_ids: Optional[List[str]] = typer.Argument(
         None, help="Program IDs to get details for. Reads from stdin if not provided."
@@ -323,37 +285,6 @@ def fetch_subtitled_programs():
         f"Programs with subtitles: {programs_with_subtitles}\n"
         f"Episodes with subtitles: {episodes_with_subtitles} / {total_episodes}"
     )
-
-
-@app.command()
-def split_episode(
-    file_path: Path = typer.Argument(
-        ...,
-        help="Path to the episode file to split.",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True,
-    ),
-    timestamp: str = typer.Argument(..., help="Timestamp to split at, e.g., [-][<HH>:]<MM>:<SS>[.<m>...]."),
-):
-    """Split an episode file into two based on the provided TIMESTAMP."""
-    console.print(f"Attempting to split file: '{file_path}' at timestamp: {timestamp}")
-    try:
-        result = main.split_episode(file_path, timestamp)
-    except FFmpegNotInstalledError:
-        console.print("[bold red]Error: ffmpeg is not installed or not found in PATH.[/bold red]")
-        raise typer.Exit(code=1)
-
-    if result:
-        console.print(f"[bold green]Successfully split '{file_path.name}'. New files created:[/bold green]")
-        for path_item in result:
-            console.print(f"  - [green]{path_item}[/green]")
-    else:
-        console.print(f"[bold red]Error: Unable to split file '{file_path}'.[/bold red]")
-        console.print(
-            "This could be due to an invalid timestamp, file format, or other issues. Check logs for details."
-        )
 
 
 # Moved ProgramRow and ProgramHeader type aliases to be defined before their first use if needed,
