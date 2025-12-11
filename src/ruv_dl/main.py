@@ -89,21 +89,22 @@ async def _download_episodes(
 
             try:
                 m3u8_playlist = m3u8.load(episode.url)
-                stream_num = -1
+                variant_index = -1
 
-                # For audio-only mode, use the first available stream (best quality)
-                if config.audio_only:
-                    stream_num = 0
-                else:
-                    for idx, playlist in enumerate(m3u8_playlist.playlists):
-                        log.debug(playlist.stream_info.resolution)
-                        # the resolution is a tuple of (width, height)
-                        if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
-                            stream_num = idx
-                            break
-                    if stream_num == -1:
-                        log.error(f"Unable to find stream with resolution {episode.quality_str} for {episode.title}")
-                        continue
+                # Use requested quality for both video and audio-only modes
+                # Audio-only benefits from better CDN caching on popular qualities
+                for idx, playlist in enumerate(m3u8_playlist.playlists):
+                    log.debug(playlist.stream_info.resolution)
+                    # the resolution is a tuple of (width, height)
+                    if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
+                        variant_index = idx
+                        break
+                if variant_index == -1:
+                    log.error(f"Unable to find stream with resolution {episode.quality_str} for {episode.title}")
+                    continue
+
+                # Always use the specific variant's playlist URL for reliability and efficiency
+                variant_url = m3u8_playlist.playlists[variant_index].absolute_uri
 
                 subtitle_file = None
                 if episode.subtitle_url:
@@ -119,8 +120,7 @@ async def _download_episodes(
                         log.error(f"Failed to download subtitle from {episode.subtitle_url}: {e}")
 
                 if download_m3u8_file(
-                    episode.url,
-                    stream_num=stream_num,
+                    variant_url,
                     output_file=output_file,
                     subtitle_file=subtitle_file,
                     audio_only=config.audio_only,

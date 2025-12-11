@@ -32,14 +32,13 @@ def qualities_str_to_int(quality_str: str) -> int:
 
 def download_m3u8_file(
     m3u8_url: str,
-    stream_num: int,
     output_file: Path,
     subtitle_file: Optional[Path] = None,
     audio_only: bool = False,
 ) -> bool:
     _check_ffmpeg_installed()
     ffmpeg_command = _create_ffmpeg_download_command(
-        m3u8_url, stream_num, output_file=output_file, subtitle_file=subtitle_file, audio_only=audio_only
+        m3u8_url, output_file=output_file, subtitle_file=subtitle_file, audio_only=audio_only
     )
     retval = ffpb.main(
         argv=ffmpeg_command,
@@ -88,9 +87,9 @@ def _create_integrity_check_ffmpeg_command(file_path: Path) -> List[str]:
 
 
 def _create_ffmpeg_download_command(
-    url: str, stream_num: int, output_file: Path, subtitle_file: Optional[Path] = None, audio_only: bool = False
+    url: str, output_file: Path, subtitle_file: Optional[Path] = None, audio_only: bool = False
 ):
-    """Create the ffmpeg command required to download a specific stream from a m3u8 playlist."""
+    """Create the ffmpeg command required to download from a variant-specific m3u8 playlist."""
     cmd = [
         # fmt: off
         "-i",
@@ -101,17 +100,10 @@ def _create_ffmpeg_download_command(
 
     if audio_only:
         # Audio-only mode: only map audio stream
-        cmd.extend(["-map", f"0:a:{stream_num}"])
+        cmd.extend(["-map", "0:a"])
     else:
         # Normal mode: map both video and audio
-        cmd.extend(
-            [
-                "-map",
-                f"0:v:{stream_num}",  # First input file, select stream_num from video streams
-                "-map",
-                f"0:a:{stream_num}",  # Same for audio
-            ]
-        )
+        cmd.extend(["-map", "0:v", "-map", "0:a"])
 
     if subtitle_file:
         cmd.extend(["-map", "1:0"])

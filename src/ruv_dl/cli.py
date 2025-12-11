@@ -111,8 +111,17 @@ def download_program(
         help=f"The quality of the file to download. Choices: {', '.join(QUALITIES_STR)}.",
         case_sensitive=False,
     ),
+    audio_only: bool = typer.Option(
+        False,
+        "--audio-only",
+        help="Download only audio stream (ignores --quality). Useful when video quality is not available.",
+    ),
 ):
     """Download all episodes of the supplied program IDs."""
+    # Validate mutual exclusivity
+    if audio_only and quality != "1080p":
+        console.print("[bold red]Error: --audio-only and --quality cannot be used together.[/bold red]")
+        raise typer.Exit(code=1)
     actual_program_ids: List[str] = []
     if program_ids:
         actual_program_ids.extend(program_ids)
@@ -131,7 +140,9 @@ def download_program(
         )
         raise typer.Exit(code=1)
 
-    CONFIG.quality = quality
+    CONFIG.audio_only = audio_only
+    if not audio_only:
+        CONFIG.quality = quality
 
     console.print(f"Attempting to download programs: {', '.join(actual_program_ids)} with quality: {quality}")
 
