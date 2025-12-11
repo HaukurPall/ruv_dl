@@ -257,9 +257,21 @@ def fetch_subtitled_programs(
         help=f"The quality of the file to download. Choices: {', '.join(QUALITIES_STR)}.",
         case_sensitive=False,
     ),
+    audio_only: bool = typer.Option(
+        False,
+        "--audio-only",
+        help="Download only audio stream (ignores --quality). Useful when video quality is not available.",
+    ),
 ):
     """Fetch all programs and download episodes that have subtitles."""
-    CONFIG.quality = quality
+    # Validate mutual exclusivity
+    if audio_only and quality != "1080p":
+        console.print("[bold red]Error: --audio-only and --quality cannot be used together.[/bold red]")
+        raise typer.Exit(code=1)
+
+    CONFIG.audio_only = audio_only
+    if not audio_only:
+        CONFIG.quality = quality
     console.print("[cyan]Fetching all programs from RÚV (this may take a while)...[/cyan]")
     programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
 

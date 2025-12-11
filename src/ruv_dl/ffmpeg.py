@@ -35,10 +35,11 @@ def download_m3u8_file(
     stream_num: int,
     output_file: Path,
     subtitle_file: Optional[Path] = None,
+    audio_only: bool = False,
 ) -> bool:
     _check_ffmpeg_installed()
     ffmpeg_command = _create_ffmpeg_download_command(
-        m3u8_url, stream_num, output_file=output_file, subtitle_file=subtitle_file
+        m3u8_url, stream_num, output_file=output_file, subtitle_file=subtitle_file, audio_only=audio_only
     )
     retval = ffpb.main(
         argv=ffmpeg_command,
@@ -86,7 +87,9 @@ def _create_integrity_check_ffmpeg_command(file_path: Path) -> List[str]:
     ]
 
 
-def _create_ffmpeg_download_command(url: str, stream_num: int, output_file: Path, subtitle_file: Optional[Path] = None):
+def _create_ffmpeg_download_command(
+    url: str, stream_num: int, output_file: Path, subtitle_file: Optional[Path] = None, audio_only: bool = False
+):
     """Create the ffmpeg command required to download a specific stream from a m3u8 playlist."""
     cmd = [
         # fmt: off
@@ -96,26 +99,36 @@ def _create_ffmpeg_download_command(url: str, stream_num: int, output_file: Path
     if subtitle_file:
         cmd.extend(["-i", str(subtitle_file)])
 
-    cmd.extend(
-        [
-            "-map",
-            f"0:v:{stream_num}",  # First input file, select stream_num from video streams
-            "-map",
-            f"0:a:{stream_num}",  # Same for audio
-        ]
-    )
+    if audio_only:
+        # Audio-only mode: only map audio stream
+        cmd.extend(["-map", f"0:a:{stream_num}"])
+    else:
+        # Normal mode: map both video and audio
+        cmd.extend(
+            [
+                "-map",
+                f"0:v:{stream_num}",  # First input file, select stream_num from video streams
+                "-map",
+                f"0:a:{stream_num}",  # Same for audio
+            ]
+        )
 
     if subtitle_file:
         cmd.extend(["-map", "1:0"])
 
-    cmd.extend(
-        [
-            "-c:v",
-            "copy",
-            "-c:a",
-            "copy",
-        ]
-    )
+    if audio_only:
+        # Audio-only mode: only copy audio codec
+        cmd.extend(["-c:a", "copy"])
+    else:
+        # Normal mode: copy both video and audio codecs
+        cmd.extend(
+            [
+                "-c:v",
+                "copy",
+                "-c:a",
+                "copy",
+            ]
+        )
 
     if subtitle_file:
         cmd.extend(["-c:s", "mov_text", "-metadata:s:s:0", "language=isl"])

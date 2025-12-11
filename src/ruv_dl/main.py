@@ -24,6 +24,7 @@ class Config:
         self.ignore_case = False
         self.only_ids = False
         self.quality: str = "1080p"
+        self.audio_only: bool = False
         self.dry_run = False
         self.max_concurrent_requests = 10
 
@@ -94,15 +95,20 @@ async def _download_episodes_from_programs(
             try:
                 m3u8_playlist = m3u8.load(episode.url)
                 stream_num = -1
-                for idx, playlist in enumerate(m3u8_playlist.playlists):
-                    log.debug(playlist.stream_info.resolution)
-                    # the resolution is a tuple of (width, height)
-                    if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
-                        stream_num = idx
-                        break
-                if stream_num == -1:
-                    log.error(f"Unable to find stream with resolution {episode.quality_str} for {episode.title}")
-                    continue
+
+                # For audio-only mode, use the first available stream (best quality)
+                if config.audio_only:
+                    stream_num = 0
+                else:
+                    for idx, playlist in enumerate(m3u8_playlist.playlists):
+                        log.debug(playlist.stream_info.resolution)
+                        # the resolution is a tuple of (width, height)
+                        if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
+                            stream_num = idx
+                            break
+                    if stream_num == -1:
+                        log.error(f"Unable to find stream with resolution {episode.quality_str} for {episode.title}")
+                        continue
 
                 subtitle_file = None
                 if episode.subtitle_url:
@@ -122,6 +128,7 @@ async def _download_episodes_from_programs(
                     stream_num=stream_num,
                     output_file=output_file,
                     subtitle_file=subtitle_file,
+                    audio_only=config.audio_only,
                 ):
                     downloaded_episodes.append(episode)
                     append_downloaded_episode(config.download_log, episode)
