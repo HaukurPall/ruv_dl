@@ -250,8 +250,16 @@ def details(
 
 
 @app.command(hidden=True)
-def fetch_subtitled_programs():
+def fetch_subtitled_programs(
+    quality: str = typer.Option(
+        "1080p",
+        "--quality",
+        help=f"The quality of the file to download. Choices: {', '.join(QUALITIES_STR)}.",
+        case_sensitive=False,
+    ),
+):
     """Fetch all programs and download episodes that have subtitles."""
+    CONFIG.quality = quality
     console.print("[cyan]Fetching all programs from RÚV (this may take a while)...[/cyan]")
     programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
 
