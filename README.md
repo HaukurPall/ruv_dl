@@ -29,6 +29,7 @@ The original plan was to fork that repo and improve upon it, but it was easier t
 
 ## Versions
 
+- 1.4.0: Added `--audio-only` flag to download commands for audio-only downloads (saved as .mp4 with mov_text subtitles). Refactored RÚV client to use immutable frozen dataclasses instead of TypedDict for better type safety. Improved download reliability by using variant-specific playlist URLs instead of master playlists.
 - 1.3.0: Removed `organize` and `split-episode` commands to simplify the codebase. Fixed intermittent `PersistedQueryNotFound` errors by switching from GET requests with persisted query hashes to POST requests with full GraphQL queries.
 - 1.2.0: Added support for subtitles. If subtitles are available they are downloaded and embedded into the video file. Large refactoring of the RÚV client.
 - 1.1.2: Fixed (silent - but deadly) error when downloading program list from RÚV, after RÚV updated. Reoccurring issues will still be silent which needs to be resolved later. Introduces a new approach to fetching programs and episodes from RÚV which is more efficient than the previous one.
@@ -113,6 +114,7 @@ It takes program ids as arguments.
 It takes the following options:
 
 - `--quality`: The video quality to download. By default, it is `1080p`, but you can also use `720p`, `480p`, `360p` and `240p`.
+- `--audio-only`: Download only the audio stream (no video). Saves as `.mp4` with mov_text subtitles embedded. Cannot be used together with `--quality`.
 
 The easiest way to download programs is to append `--only-ids` to the `search` command and pipe it to the `download-program` command:
 
@@ -131,7 +133,8 @@ Blæja ||| Þáttur 8 af 52 ||| Bluey [1080p].mp4  Blæja ||| Þáttur 9 af 52 |
 ```
 
 The naming convention of the downloaded files is:
-`Program title ||| Episode title ||| foreign title [QUALITY].mp4`
+- Video: `Program title ||| Episode title ||| foreign title [QUALITY].mp4`
+- Audio-only: `Program title ||| Episode title ||| foreign title [QUALITY]_audio_only.mp4`
 
 ### The `downloaded.jsonl` file
 

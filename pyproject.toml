@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ruv-dl"
-version = "1.3.0"
+version = "1.4.0"
 description = "Python script to download content off the Icelandic RÚV website."
 readme = "README.md"
 license = { text = "MIT License" }

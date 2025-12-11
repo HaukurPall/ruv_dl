@@ -80,7 +80,8 @@ async def _download_episodes(
             episode = cast(EpisodeDownload, episode)
             tqdm_iter.set_description(f"Downloading {episode.program_title} - {episode.title}")
             # TODO: Handle mp3 files
-            output_file = config.download_dir / f"{episode.file_name()}.mp4"
+            suffix = "_audio_only" if config.audio_only else ""
+            output_file = config.download_dir / f"{episode.file_name()}{suffix}.mp4"
             # No need to download file again if it's there and ok.
             if check_file_validity(output_file):
                 skipped_episodes.append(episode)
@@ -105,6 +106,7 @@ async def _download_episodes(
 
                 # Always use the specific variant's playlist URL for reliability and efficiency
                 variant_url = m3u8_playlist.playlists[variant_index].absolute_uri
+                log.info(f"Selected variant URL for {episode.title}: {variant_url}")
 
                 subtitle_file = None
                 if episode.subtitle_url:

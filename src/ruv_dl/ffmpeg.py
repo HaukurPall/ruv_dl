@@ -1,3 +1,4 @@
+import logging
 import shutil
 import signal
 import sys
@@ -7,6 +8,8 @@ from typing import List, Optional
 
 import ffpb
 from tqdm import tqdm
+
+log = logging.getLogger(__name__)
 
 
 class FFmpegNotInstalledError(Exception):
@@ -40,6 +43,7 @@ def download_m3u8_file(
     ffmpeg_command = _create_ffmpeg_download_command(
         m3u8_url, output_file=output_file, subtitle_file=subtitle_file, audio_only=audio_only
     )
+    log.debug(f"FFmpeg command: {' '.join(ffmpeg_command)}")
     retval = ffpb.main(
         argv=ffmpeg_command,
         stream=sys.stderr,
@@ -90,14 +94,15 @@ def _create_ffmpeg_download_command(
     url: str, output_file: Path, subtitle_file: Optional[Path] = None, audio_only: bool = False
 ):
     """Create the ffmpeg command required to download from a variant-specific m3u8 playlist."""
-    cmd = [
-        # fmt: off
-        "-i",
-        url,
-    ]
+    cmd = []
+
+    # Add main input (HLS stream)
+    cmd.extend(["-i", url])
+
     if subtitle_file:
         cmd.extend(["-i", str(subtitle_file)])
 
+    # Map streams
     if audio_only:
         # Audio-only mode: only map audio stream
         cmd.extend(["-map", "0:a"])
@@ -108,21 +113,16 @@ def _create_ffmpeg_download_command(
     if subtitle_file:
         cmd.extend(["-map", "1:0"])
 
+    # Set codecs
     if audio_only:
         # Audio-only mode: only copy audio codec
         cmd.extend(["-c:a", "copy"])
     else:
         # Normal mode: copy both video and audio codecs
-        cmd.extend(
-            [
-                "-c:v",
-                "copy",
-                "-c:a",
-                "copy",
-            ]
-        )
+        cmd.extend(["-c:v", "copy", "-c:a", "copy"])
 
     if subtitle_file:
+        # Always use mov_text for MP4 format
         cmd.extend(["-c:s", "mov_text", "-metadata:s:s:0", "language=isl"])
 
     cmd.append(str(output_file))
