@@ -251,15 +251,20 @@ def details(
 
 @app.command(hidden=True)
 def fetch_subtitled_programs():
-    """Fetch all programs that have subtitles."""
-    console.print("[cyan]Fetching all programs and checking for subtitles...[/cyan]")
+    """Fetch all programs and download episodes that have subtitles."""
+    console.print("[cyan]Fetching all programs from RÚV (this may take a while)...[/cyan]")
     programs_data = asyncio.run(main.find_all_subtitles(config=CONFIG))
+
+    console.print(f"[cyan]Analyzing {len(programs_data)} programs for subtitle information...[/cyan]\n")
 
     total_episodes = 0
     episodes_with_subtitles = 0
     programs_with_subtitles = 0
+    total_programs_checked = 0
+    programs_to_download = []
 
     for program_id_key, program_details_dict in programs_data.items():
+        total_programs_checked += 1
         episodes = program_details_dict.get("episodes", [])
         has_subtitles = False
         for episode in episodes:
@@ -276,14 +281,57 @@ def fetch_subtitled_programs():
 
         if has_subtitles:
             programs_with_subtitles += 1
-            console.print(
-                f"[green]Found subtitles in:[/green] {program_details_dict.get('title')} (ID: {program_details_dict.get('id')})"
+            episode_count = len(episodes)
+            subtitle_count = sum(
+                1
+                for ep in episodes
+                if ep.get("subtitles")
+                or ep.get("closed_subtitles")
+                or ep.get("open_subtitles")
+                or ep.get("auto_subtitles")
             )
+            console.print(
+                f"[green]✓[/green] {program_details_dict.get('title')} "
+                f"[dim](ID: {program_details_dict.get('id')}, {subtitle_count}/{episode_count} episodes)[/dim]"
+            )
+            programs_to_download.append(program_details_dict)
 
     console.print(
-        f"\n[bold green]Summary:[/bold green]\n"
+        f"\n[bold cyan]Analysis Summary:[/bold cyan]\n"
+        f"Total programs checked: {total_programs_checked}\n"
         f"Programs with subtitles: {programs_with_subtitles}\n"
-        f"Episodes with subtitles: {episodes_with_subtitles} / {total_episodes}"
+        f"Episodes with subtitles: {episodes_with_subtitles} / {total_episodes}\n"
+    )
+
+    if not programs_to_download:
+        console.print("[yellow]No programs with subtitles found to download.[/yellow]")
+        return
+
+    console.print(f"\n[cyan]Starting download of {len(programs_to_download)} programs...[/cyan]\n")
+
+    total_downloaded = 0
+    total_skipped = 0
+
+    for program in programs_to_download:
+        program_title = program.get("title", "Unknown")
+        console.print(f"[bold blue]Downloading:[/bold blue] {program_title}")
+
+        downloaded_episodes, skipped_episodes = asyncio.run(
+            main._download_episodes_from_programs(programs={program["id"]: program}, config=CONFIG)
+        )
+
+        total_downloaded += len(downloaded_episodes)
+        total_skipped += len(skipped_episodes)
+
+        if downloaded_episodes:
+            console.print(f"  [green]✓ Downloaded {len(downloaded_episodes)} episode(s)[/green]")
+        if skipped_episodes:
+            console.print(f"  [yellow]⊘ Skipped {len(skipped_episodes)} episode(s)[/yellow]")
+
+    console.print(
+        f"\n[bold green]Download Summary:[/bold green]\n"
+        f"Total episodes downloaded: {total_downloaded}\n"
+        f"Total episodes skipped: {total_skipped}"
     )
 
 
