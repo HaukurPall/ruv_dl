@@ -1,6 +1,5 @@
 """A module for handling HLS downloading"""
 
-from pathlib import Path
 from typing import List, Tuple
 
 import m3u8

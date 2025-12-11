@@ -89,7 +89,7 @@ def search(
         # found_programs is of type Programs (Dict[int, ProgramDict])
         # We should print the keys (program IDs) or the 'id' field from the values.
         # Using program['id'] from values is consistent with program_results
-        console.print(" ".join([str(p_data["id"]) for p_data in found_programs.values()]))
+        console.print(" ".join([str(p_data.id) for p_data in found_programs.values()]))
     else:
         headers, rows = program_results(found_programs)
         table = Table(title="Search Results", show_header=True, header_style="bold magenta")
@@ -184,20 +184,18 @@ def details(
 
     for program_id_key, program_details_dict in programs_data.items():
         console.print(
-            f"\n[bold magenta]Program: {program_details_dict.get('title', 'N/A')} (ID: {program_details_dict.get('id', program_id_key)})[/bold magenta]"
+            f"\n[bold magenta]Program: {program_details_dict.title} (ID: {program_details_dict.id})[/bold magenta]"
         )
-        console.print(f"  [cyan]Foreign Title:[/cyan] {program_details_dict.get('foreign_title', 'N/A')}")
-        console.print(
-            f"  [cyan]Description:[/cyan] {program_details_dict.get('short_description') or program_details_dict.get('description', 'N/A')}"
-        )
+        console.print(f"  [cyan]Foreign Title:[/cyan] {program_details_dict.foreign_title or 'N/A'}")
+        console.print(f"  [cyan]Description:[/cyan] {program_details_dict.short_description or 'N/A'}")
 
-        episodes = program_details_dict.get("episodes", [])
+        episodes = program_details_dict.episodes
         if not episodes:
             console.print("  [yellow]No episodes found for this program.[/yellow]")
             continue
 
         episode_table = Table(
-            title=f"Episodes for {program_details_dict.get('title', 'N/A')}",
+            title=f"Episodes for {program_details_dict.title}",
             show_header=True,
             header_style="bold blue",
         )
@@ -209,23 +207,15 @@ def details(
         episode_table.add_column("File URL", overflow="fold")
 
         for episode in episodes:
-            episode_title = episode.get("title", "N/A")
-            episode_id = str(episode.get("id", "N/A"))
-            published_date = (
-                episode.get("firstrun", {}).get("isl", {}).get("date", "N/A")
-                if isinstance(episode.get("firstrun"), dict)
-                else episode.get("firstrun", "N/A")
-            )
-            duration = (
-                str(episode.get("duration", {}).get("seconds", "N/A"))
-                if isinstance(episode.get("duration"), dict)
-                else str(episode.get("duration", "N/A"))
-            )
+            episode_title = episode.title or "N/A"
+            episode_id = str(episode.id)
+            published_date = episode.firstrun or "N/A"
+            duration = "N/A"  # Duration field not in Episode dataclass
 
             available_qualities_str = "N/A"
-            if episode.get("file"):
+            if episode.file:
                 try:
-                    resolutions = load_m3u8_available_resolutions(episode["file"])
+                    resolutions = load_m3u8_available_resolutions(episode.file)
                     if resolutions:
                         available_qualities_str = "/".join(
                             f"{res_h}p" for _, res_h in sorted(resolutions, key=lambda x: x[1], reverse=True)
@@ -233,10 +223,10 @@ def details(
                     else:
                         available_qualities_str = "[yellow]Could not fetch[/yellow]"
                 except Exception as e:
-                    log.debug(f"Could not load resolutions for {episode.get('file')}: {e}")
+                    log.debug(f"Could not load resolutions for {episode.file}: {e}")
                     available_qualities_str = "[red]Error fetching[/red]"
 
-            file_url = episode.get("file", "N/A")
+            file_url = episode.file or "N/A"
 
             episode_table.add_row(
                 episode_title,
@@ -291,12 +281,9 @@ def fetch_subtitled_programs(
         for episode in episodes:
             total_episodes += 1
             # Check if episode has subtitles
-            subtitles = episode.get("subtitles", [])
-            closed_subtitles = episode.get("closed_subtitles", False)
-            open_subtitles = episode.get("open_subtitles", False)
-            auto_subtitles = episode.get("auto_subtitles", False)
+            subtitles = episode.subtitles
 
-            if subtitles or closed_subtitles or open_subtitles or auto_subtitles:
+            if subtitles:
                 episodes_with_subtitles += 1
                 program_episodes_with_subtitles.append(episode)
 
@@ -305,8 +292,8 @@ def fetch_subtitled_programs(
             episode_count = len(episodes)
             subtitle_count = len(program_episodes_with_subtitles)
             console.print(
-                f"[green]✓[/green] {program_details_dict.get('title')} "
-                f"[dim](ID: {program_details_dict.get('id')}, {subtitle_count}/{episode_count} episodes)[/dim]"
+                f"[green]✓[/green] {program_details_dict.title} "
+                f"[dim](ID: {program_details_dict.id}, {subtitle_count}/{episode_count} episodes)[/dim]"
             )
             # Convert episodes to EpisodeDownload objects and add to list
             for episode in program_episodes_with_subtitles:
@@ -358,14 +345,12 @@ def program_results(programs: Programs) -> Tuple[ProgramHeader, List[ProgramRow]
     rows = []
     for program_id_key, program_content in programs.items():
         try:
-            title = program_content.get("title", "N/A")
-            foreign_title = program_content.get("foreign_title", "N/A")
-            episodes = program_content.get("episodes", [])
+            title = program_content.title
+            foreign_title = program_content.foreign_title or "N/A"
+            episodes = program_content.episodes
             episode_count = len(episodes)
-            # Use program_id_key (the dict key) or program_content.get('id')
-            # Prefer program_content.get('id') if it's reliably the ID, otherwise program_id_key
-            actual_program_id = program_content.get("id", program_id_key)
-            short_desc = program_content.get("short_description", "")
+            actual_program_id = program_content.id
+            short_desc = program_content.short_description or ""
 
             rows.append(
                 (

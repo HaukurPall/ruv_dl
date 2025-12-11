@@ -22,26 +22,25 @@ class EpisodeDownload:
     @staticmethod
     def from_episode_and_program(episode: Episode, program: Program, quality: str) -> "EpisodeDownload":
         subtitle_url = None
-        subtitles = episode.get("subtitles", [])
+        subtitles = episode.subtitles
         if subtitles:
-            # Prefer Icelandic subtitles
             for sub in subtitles:
-                if sub.get("name") == "is":
-                    subtitle_url = sub.get("value")
+                if sub.name == "is":
+                    subtitle_url = sub.value
                     break
             # Fallback to the first available subtitle if 'is' not found
             if subtitle_url is None and len(subtitles) > 0:
-                subtitle_url = subtitles[0].get("value")
+                subtitle_url = subtitles[0].value
 
         return EpisodeDownload(
-            id=episode["id"],
-            program_id=program["id"],
-            program_title=program["title"],
-            title=episode["title"],
-            foreign_title=program["foreign_title"],
+            id=episode.id,
+            program_id=program.id,
+            program_title=program.title,
+            title=episode.title,
+            foreign_title=program.foreign_title,
             quality_str=quality,
-            url=episode["file"],
-            firstrun=episode["firstrun"],
+            url=episode.file,
+            firstrun=episode.firstrun,
             subtitle_url=subtitle_url,
         )
 

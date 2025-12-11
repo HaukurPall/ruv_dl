@@ -46,7 +46,7 @@ async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
         for pattern in patterns:
             found_programs.update(get_all_programs_by_pattern(programs, pattern, config.ignore_case))
         found_programs = await client.get_programs_with_episodes(
-            program_ids=list(p["programID"] for p in found_programs.values()),
+            program_ids=list(p.programID for p in found_programs.values()),
             limit=config.max_concurrent_requests,
         )
     return found_programs
@@ -150,7 +150,7 @@ async def _download_episodes_from_programs(
     selected_episodes = [
         EpisodeDownload.from_episode_and_program(episode, program, config.quality)
         for program in programs.values()
-        for episode in program["episodes"]
+        for episode in program.episodes
     ]
     return await _download_episodes(selected_episodes, config)
 
@@ -214,7 +214,7 @@ async def get_all_programs_with_episodes(config: Config) -> Programs:
     log.info("Fetching all programs...")
     async with RUVClient() as client:
         all_programs = await client.get_all_programs()
-        program_ids = [p["programID"] for p in all_programs.values()]
+        program_ids = [p.programID for p in all_programs.values()]
         log.info(f"Fetching episode details for {len(program_ids)} programs...")
         programs_data: Programs = await client.get_programs_with_episodes(
             program_ids=program_ids,

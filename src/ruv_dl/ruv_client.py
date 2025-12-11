@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Dict, List, Optional, TypedDict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 import httpx
 from tqdm import tqdm
@@ -14,40 +15,80 @@ class RUVAPIError(Exception):
     pass
 
 
-class Subtitle(TypedDict):
+@dataclass(frozen=True)
+class Subtitle:
+    """A subtitle with language and URL"""
+
     name: str  # This is actually the language extension (is)
     value: str  # This is a URL to the subtitle file
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "Subtitle":
+        return cls(name=data["name"], value=data["value"])
 
-class Episode(TypedDict):
+
+@dataclass(frozen=True)
+class Episode:
     """A single episode"""
 
     id: str
     title: str
     file: str
     firstrun: str  # 2009-01-01 22:10:00
-    subtitles: List[Subtitle]
-    open_subtitles: bool
-    closed_subtitles: bool
-    auto_subtitles: bool
+    subtitles: List[Subtitle] = field(default_factory=list)
+    open_subtitles: bool = False
+    closed_subtitles: bool = False
+    auto_subtitles: bool = False
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Episode":
+        subtitles = [Subtitle.from_dict(s) for s in data.get("subtitles", [])]
+        return cls(
+            id=data["id"],
+            title=data.get("title", ""),
+            file=data.get("file", ""),
+            firstrun=data.get("firstrun", ""),
+            subtitles=subtitles,
+            open_subtitles=data.get("open_subtitles", False),
+            closed_subtitles=data.get("closed_subtitles", False),
+            auto_subtitles=data.get("auto_subtitles", False),
+        )
 
 
-class Program(TypedDict):
+@dataclass(frozen=True)
+class Program:
     """A single program"""
 
     programID: int
     id: str
     title: str
-    foreign_title: Optional[str]
-    short_description: Optional[str]
-    episodes: List[Episode]
+    foreign_title: Optional[str] = None
+    short_description: Optional[str] = None
+    episodes: List[Episode] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Program":
+        episodes = [Episode.from_dict(e) for e in data.get("episodes", [])]
+        return cls(
+            programID=data.get("programID", 0),
+            id=data["id"],
+            title=data["title"],
+            foreign_title=data.get("foreign_title"),
+            short_description=data.get("short_description"),
+            episodes=episodes,
+        )
 
 
-class Category(TypedDict):
+@dataclass(frozen=True)
+class Category:
     """A single category"""
 
     title: str
     slug: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Category":
+        return cls(title=data["title"], slug=data["slug"])
 
 
 Programs = Dict[str, Program]
@@ -111,7 +152,7 @@ class RUVClient:
         """
         variables = {"station": category_type}
         data = await self._query_post("getCategories", variables, query)
-        return data["Category"]["categories"]
+        return [Category.from_dict(cat) for cat in data["Category"]["categories"]]
 
     async def get_category_programs(self, slug: str, category_type: str = "tv") -> List[Program]:
         """Get all programs in a category"""
@@ -135,7 +176,7 @@ class RUVClient:
         """
         variables = {"category": slug, "station": category_type}
         data = await self._query_post("getCategory", variables, query)
-        return data["Category"]["categories"][0]["programs"]
+        return [Program.from_dict(prog) for prog in data["Category"]["categories"][0]["programs"]]
 
     async def get_program_episodes(self, program_id: int) -> Optional[Program]:
         """Get a program with detailed episode info including file URLs"""
@@ -172,7 +213,8 @@ class RUVClient:
 
         variables = {"programID": program_id}
         data = await self._query_post("getEpisode", variables, query)
-        return data["Program"]
+        program_data = data["Program"]
+        return Program.from_dict(program_data) if program_data else None
 
     async def get_all_programs(self) -> Programs:
         """Get all programs from RÚV (without detailed episode info)"""
@@ -182,14 +224,14 @@ class RUVClient:
 
         log.info("Fetching programs from all categories...")
         category_programs = await asyncio.gather(
-            *[self.get_category_programs(category["slug"]) for category in categories]
+            *[self.get_category_programs(category.slug) for category in categories]
         )
 
         # Flatten the list of lists and convert to dict
         all_programs = [program for programs in category_programs for program in programs]
         log.info(f"Found {len(all_programs)} total programs")
 
-        return {program["id"]: program for program in all_programs}
+        return {program.id: program for program in all_programs}
 
     async def get_programs_with_episodes(self, program_ids: List[int], limit: int = 10) -> Programs:
         """Get detailed program info with file URLs for episodes"""
@@ -217,4 +259,4 @@ class RUVClient:
                 log.warning(f"Could not fetch program ID {pid}.")
 
         # Ensure 'id' exists in program objects before creating the dictionary
-        return {prog["id"]: prog for prog in fetched_programs if prog and "id" in prog}
+        return {prog.id: prog for prog in fetched_programs if prog}
