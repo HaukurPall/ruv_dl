@@ -286,7 +286,7 @@ def fetch_subtitled_programs(
 
     for program_id_key, program_details_dict in programs_data.items():
         total_programs_checked += 1
-        episodes = program_details_dict.get("episodes", [])
+        episodes = program_details_dict.episodes
         program_episodes_with_subtitles = []
 
         for episode in episodes:
