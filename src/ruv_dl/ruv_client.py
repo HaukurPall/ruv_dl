@@ -229,6 +229,7 @@ class RUVClient:
 
         # Flatten the list of lists and convert to dict
         all_programs = [program for programs in category_programs for program in programs]
+        all_programs.sort(key=lambda p: p.title)
         log.info(f"Found {len(all_programs)} total programs")
 
         return {program.id: program for program in all_programs}
@@ -257,6 +258,8 @@ class RUVClient:
                 fetched_programs.append(program)
             else:
                 log.warning(f"Could not fetch program ID {pid}.")
+
+        fetched_programs.sort(key=lambda p: p.title)
 
         # Ensure 'id' exists in program objects before creating the dictionary
         return {prog.id: prog for prog in fetched_programs if prog}
