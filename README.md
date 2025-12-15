@@ -29,6 +29,7 @@ The original plan was to fork that repo and improve upon it, but it was easier t
 
 ## Versions
 
+- 1.5.0: Enhanced file naming with episode IDs to prevent collisions and added automatic migration for existing files. Implemented sorting for programs (alphabetical) and episodes (chronological) in all outputs. Optimized audio-only downloads to use lower bandwidth streams.
 - 1.4.0: Added `--audio-only` flag to download commands for audio-only downloads (saved as .mp4 with mov_text subtitles). Refactored RÚV client to use immutable frozen dataclasses instead of TypedDict for better type safety. Improved download reliability by using variant-specific playlist URLs instead of master playlists.
 - 1.3.0: Removed `organize` and `split-episode` commands to simplify the codebase. Fixed intermittent `PersistedQueryNotFound` errors by switching from GET requests with persisted query hashes to POST requests with full GraphQL queries.
 - 1.2.0: Added support for subtitles. If subtitles are available they are downloaded and embedded into the video file. Large refactoring of the RÚV client.
@@ -133,8 +134,8 @@ Blæja ||| Þáttur 8 af 52 ||| Bluey [1080p].mp4  Blæja ||| Þáttur 9 af 52 |
 ```
 
 The naming convention of the downloaded files is:
-- Video: `Program title ||| Episode title ||| foreign title [QUALITY].mp4`
-- Audio-only: `Program title ||| Episode title ||| foreign title [QUALITY]_audio_only.mp4`
+- Video: `Program title ||| Episode title ||| foreign title [QUALITY] [ID].mp4`
+- Audio-only: `Program title ||| Episode title ||| foreign title [QUALITY] [ID]_audio_only.mp4`
 
 ### The `downloaded.jsonl` file
 
