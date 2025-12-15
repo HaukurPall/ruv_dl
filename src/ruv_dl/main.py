@@ -82,6 +82,20 @@ async def _download_episodes(
             # TODO: Handle mp3 files
             suffix = "_audio_only" if config.audio_only else ""
             output_file = config.download_dir / f"{episode.file_name()}{suffix}.mp4"
+
+            # Check for legacy file and migrate if necessary
+            if not output_file.exists():
+                legacy_file = config.download_dir / f"{episode.legacy_file_name()}{suffix}.mp4"
+                if legacy_file.exists():
+                    log.info(f"Migrating legacy file: {legacy_file.name} -> {output_file.name}")
+                    legacy_file.rename(output_file)
+
+                    # Also migrate subtitle if it exists
+                    legacy_sub = config.download_dir / f"{episode.legacy_file_name()}.vtt"
+                    new_sub = config.download_dir / f"{episode.file_name()}.vtt"
+                    if legacy_sub.exists() and not new_sub.exists():
+                        legacy_sub.rename(new_sub)
+
             # No need to download file again if it's there and ok.
             if check_file_validity(output_file):
                 skipped_episodes.append(episode)
