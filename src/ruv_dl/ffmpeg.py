@@ -59,42 +59,11 @@ def download_m3u8_file(
     return True
 
 
-def check_mp4_integrity(file_path: Path) -> bool:
-    _check_ffmpeg_installed()
-    ffmpeg_command = _create_integrity_check_ffmpeg_command(file_path)
-    retval = ffpb.main(
-        argv=ffmpeg_command,
-        stream=sys.stderr,
-        encoding="utf-8",
-        tqdm=partial(tqdm, leave=False),
-    )
-    if retval != 0:
-        file_path.unlink()
-        if retval == signal.SIGINT + 128:
-            raise KeyboardInterrupt
-        return False
-    return True
-
-
-def _create_integrity_check_ffmpeg_command(file_path: Path) -> List[str]:
-    return [
-        # fmt: off
-        "-i",
-        str(file_path),
-        "-map",
-        "0:1",
-        "-f",
-        "null",
-        "-",
-        # fmt: on
-    ]
-
-
 def _create_ffmpeg_download_command(
     url: str, output_file: Path, subtitle_file: Optional[Path] = None, audio_only: bool = False
 ):
     """Create the ffmpeg command required to download from a variant-specific m3u8 playlist."""
-    cmd = []
+    cmd = ["-y", "-nostdin"]
 
     # Add main input (HLS stream)
     cmd.extend(["-i", url])

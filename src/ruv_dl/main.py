@@ -6,7 +6,7 @@ import httpx
 import m3u8
 from tqdm import tqdm
 
-from ruv_dl.ffmpeg import check_mp4_integrity, download_m3u8_file, qualities_str_to_int
+from ruv_dl.ffmpeg import download_m3u8_file, qualities_str_to_int
 from ruv_dl.ruv_client import Programs, RUVClient
 from ruv_dl.search import get_all_programs_by_pattern
 from ruv_dl.storage import EpisodeDownload, filter_downloaded_episodes
@@ -227,10 +227,7 @@ async def get_all_programs_with_episodes(config: Config) -> Programs:
 
 
 def check_file_validity(file_path: Path) -> bool:
-    if not file_path.exists():
-        return False
-    # The file exists - check integrity
-    return check_mp4_integrity(file_path)
+    return file_path.exists()
 
 
 def read_downloaded_episodes(path: Path) -> List[EpisodeDownload]:
