@@ -92,16 +92,25 @@ async def _download_episodes(
                 m3u8_playlist = m3u8.load(episode.url)
                 variant_index = -1
 
-                # Use requested quality for both video and audio-only modes
-                # Audio-only benefits from better CDN caching on popular qualities
-                for idx, playlist in enumerate(m3u8_playlist.playlists):
-                    log.debug(playlist.stream_info.resolution)
-                    # the resolution is a tuple of (width, height)
-                    if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
-                        variant_index = idx
-                        break
+                if config.audio_only:
+                    # For audio-only, select the variant with the lowest bandwidth
+                    # This often results in better speeds for audio extraction
+                    lowest_bandwidth = float("inf")
+                    for idx, playlist in enumerate(m3u8_playlist.playlists):
+                        if playlist.stream_info.bandwidth and playlist.stream_info.bandwidth < lowest_bandwidth:
+                            lowest_bandwidth = playlist.stream_info.bandwidth
+                            variant_index = idx
+                else:
+                    # Use requested quality for video downloads
+                    for idx, playlist in enumerate(m3u8_playlist.playlists):
+                        log.debug(playlist.stream_info.resolution)
+                        # the resolution is a tuple of (width, height)
+                        if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
+                            variant_index = idx
+                            break
+
                 if variant_index == -1:
-                    log.error(f"Unable to find stream with resolution {episode.quality_str} for {episode.title}")
+                    log.error(f"Unable to find suitable stream for {episode.title}")
                     continue
 
                 # Always use the specific variant's playlist URL for reliability and efficiency
