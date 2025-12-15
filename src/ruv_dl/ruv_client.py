@@ -69,6 +69,7 @@ class Program:
     @classmethod
     def from_dict(cls, data: dict) -> "Program":
         episodes = [Episode.from_dict(e) for e in data.get("episodes", [])]
+        episodes.sort(key=lambda e: (e.firstrun or "", e.id))
         return cls(
             programID=data.get("programID", 0),
             id=data["id"],
