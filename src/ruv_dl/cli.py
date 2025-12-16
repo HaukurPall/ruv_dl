@@ -37,12 +37,20 @@ the program list is cached as "$WORK_DIR/programs.json", etc..
         help="The log level of the stdout. WARNING by default.",
         case_sensitive=False,
     ),
+    max_parallel_downloads: int = typer.Option(
+        1,
+        "--max-parallel-downloads",
+        "-j",
+        help="Maximum number of parallel downloads.",
+        min=1,
+    ),
 ):
     """
     RÚV Downloader: A CLI tool to download content from RÚV.
     """
     global CONFIG
     CONFIG = main.Config(work_dir)
+    CONFIG.max_parallel_downloads = max_parallel_downloads
     CONFIG.initialize_dirs()
 
     # Ensure log_level is uppercase for consistent comparison

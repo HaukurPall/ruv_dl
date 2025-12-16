@@ -61,13 +61,6 @@ class EpisodeDownload:
     def legacy_file_name(self) -> str:
         return f"{self.program_title} ||| {self.title} ||| {self.foreign_title} [{self.quality_str}]".replace("/", "|")
 
-    @staticmethod
-    def file_name_regexp(extension: str) -> str:
-        return (
-            r"^(?P<program_title>.+?) \|\|\| (?P<title>.+?) \|\|\| (?P<foreign_title>.+?)(?P<quality_str> \[.+?\])? \[(?P<id>.+?)\]"
-            + f".{extension}"
-        )
-
 
 def filter_downloaded_episodes(
     downloaded_episodes: List[EpisodeDownload],

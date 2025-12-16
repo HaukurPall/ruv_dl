@@ -1,6 +1,7 @@
+import asyncio
 import logging
 from pathlib import Path
-from typing import List, Tuple, cast
+from typing import List, Tuple
 
 import httpx
 import m3u8
@@ -27,6 +28,7 @@ class Config:
         self.audio_only: bool = False
         self.dry_run = False
         self.max_concurrent_requests = 10
+        self.max_parallel_downloads = 1
 
     def initialize_dirs(self):
         """Creates all necessary directories which the progam expects."""
@@ -52,6 +54,93 @@ async def search(patterns: Tuple[str, ...], config: Config) -> Programs:
     return found_programs
 
 
+async def _process_episode(episode: EpisodeDownload, config: Config) -> Tuple[str, EpisodeDownload]:
+    # TODO: Handle mp3 files
+    suffix = "_audio_only" if config.audio_only else ""
+    output_file = config.download_dir / f"{episode.file_name()}{suffix}.mp4"
+
+    # Check for legacy file and migrate if necessary
+    if not output_file.exists():
+        legacy_file = config.download_dir / f"{episode.legacy_file_name()}{suffix}.mp4"
+        if legacy_file.exists():
+            log.info(f"Migrating legacy file: {legacy_file.name} -> {output_file.name}")
+            legacy_file.rename(output_file)
+
+            # Also migrate subtitle if it exists
+            legacy_sub = config.download_dir / f"{episode.legacy_file_name()}.vtt"
+            new_sub = config.download_dir / f"{episode.file_name()}.vtt"
+            if legacy_sub.exists() and not new_sub.exists():
+                legacy_sub.rename(new_sub)
+
+    # No need to download file again if it's there and ok.
+    if check_file_validity(output_file):
+        return "skipped", episode
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(episode.url)
+            response.raise_for_status()
+            m3u8_content = response.text
+
+        m3u8_playlist = m3u8.loads(m3u8_content, uri=episode.url)
+        variant_index = -1
+
+        if config.audio_only:
+            # For audio-only, select the variant with the lowest bandwidth
+            # This often results in better speeds for audio extraction
+            lowest_bandwidth = float("inf")
+            for idx, playlist in enumerate(m3u8_playlist.playlists):
+                if playlist.stream_info.bandwidth and playlist.stream_info.bandwidth < lowest_bandwidth:
+                    lowest_bandwidth = playlist.stream_info.bandwidth
+                    variant_index = idx
+        else:
+            # Use requested quality for video downloads
+            for idx, playlist in enumerate(m3u8_playlist.playlists):
+                log.debug(playlist.stream_info.resolution)
+                # the resolution is a tuple of (width, height)
+                if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
+                    variant_index = idx
+                    break
+
+        if variant_index == -1:
+            log.error(f"Unable to find suitable stream for {episode.title}")
+            return "failed", episode
+
+        # Always use the specific variant's playlist URL for reliability and efficiency
+        variant_url = m3u8_playlist.playlists[variant_index].absolute_uri
+        log.info(f"Selected variant URL for {episode.title}: {variant_url}")
+
+        subtitle_file = None
+        if episode.subtitle_url:
+            subtitle_path = config.download_dir / f"{episode.file_name()}.vtt"
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(episode.subtitle_url)
+                    response.raise_for_status()
+                    with open(subtitle_path, "w", encoding="utf-8") as f:
+                        f.write(response.text)
+                subtitle_file = subtitle_path
+            except Exception as e:
+                log.error(f"Failed to download subtitle from {episode.subtitle_url}: {e}")
+
+        # Run ffmpeg in a thread to avoid blocking asyncio loop
+        success = await asyncio.to_thread(
+            download_m3u8_file,
+            variant_url,
+            output_file=output_file,
+            subtitle_file=subtitle_file,
+            audio_only=config.audio_only,
+        )
+
+        if success:
+            return "downloaded", episode
+
+    except Exception as e:
+        log.error(f"Error downloading {episode.title}: {e}")
+
+    return "failed", episode
+
+
 async def _download_episodes(
     episodes: List[EpisodeDownload], config: Config
 ) -> Tuple[List[EpisodeDownload], List[EpisodeDownload]]:
@@ -74,95 +163,26 @@ async def _download_episodes(
     if already_downloaded_episodes:
         log.info(f"Skipping {len(already_downloaded_episodes)} episodes that were already downloaded")
 
-    tqdm_iter = tqdm(episodes_to_download)
-    try:
-        for episode in tqdm_iter:
-            episode = cast(EpisodeDownload, episode)
-            tqdm_iter.set_description(f"Downloading {episode.program_title} - {episode.title}")
-            # TODO: Handle mp3 files
-            suffix = "_audio_only" if config.audio_only else ""
-            output_file = config.download_dir / f"{episode.file_name()}{suffix}.mp4"
+    semaphore = asyncio.Semaphore(config.max_parallel_downloads)
 
-            # Check for legacy file and migrate if necessary
-            if not output_file.exists():
-                legacy_file = config.download_dir / f"{episode.legacy_file_name()}{suffix}.mp4"
-                if legacy_file.exists():
-                    log.info(f"Migrating legacy file: {legacy_file.name} -> {output_file.name}")
-                    legacy_file.rename(output_file)
+    async def worker(episode: EpisodeDownload) -> Tuple[str, EpisodeDownload]:
+        async with semaphore:
+            return await _process_episode(episode, config)
 
-                    # Also migrate subtitle if it exists
-                    legacy_sub = config.download_dir / f"{episode.legacy_file_name()}.vtt"
-                    new_sub = config.download_dir / f"{episode.file_name()}.vtt"
-                    if legacy_sub.exists() and not new_sub.exists():
-                        legacy_sub.rename(new_sub)
-
-            # No need to download file again if it's there and ok.
-            if check_file_validity(output_file):
-                skipped_episodes.append(episode)
-                append_downloaded_episode(config.download_log, episode)
-                continue
-
-            try:
-                m3u8_playlist = m3u8.load(episode.url)
-                variant_index = -1
-
-                if config.audio_only:
-                    # For audio-only, select the variant with the lowest bandwidth
-                    # This often results in better speeds for audio extraction
-                    lowest_bandwidth = float("inf")
-                    for idx, playlist in enumerate(m3u8_playlist.playlists):
-                        if playlist.stream_info.bandwidth and playlist.stream_info.bandwidth < lowest_bandwidth:
-                            lowest_bandwidth = playlist.stream_info.bandwidth
-                            variant_index = idx
-                else:
-                    # Use requested quality for video downloads
-                    for idx, playlist in enumerate(m3u8_playlist.playlists):
-                        log.debug(playlist.stream_info.resolution)
-                        # the resolution is a tuple of (width, height)
-                        if playlist.stream_info.resolution[1] == qualities_str_to_int(episode.quality_str):
-                            variant_index = idx
-                            break
-
-                if variant_index == -1:
-                    log.error(f"Unable to find suitable stream for {episode.title}")
-                    continue
-
-                # Always use the specific variant's playlist URL for reliability and efficiency
-                variant_url = m3u8_playlist.playlists[variant_index].absolute_uri
-                log.info(f"Selected variant URL for {episode.title}: {variant_url}")
-
-                subtitle_file = None
-                if episode.subtitle_url:
-                    subtitle_path = config.download_dir / f"{episode.file_name()}.vtt"
-                    try:
-                        async with httpx.AsyncClient() as client:
-                            response = await client.get(episode.subtitle_url)
-                            response.raise_for_status()
-                            with open(subtitle_path, "w", encoding="utf-8") as f:
-                                f.write(response.text)
-                        subtitle_file = subtitle_path
-                    except Exception as e:
-                        log.error(f"Failed to download subtitle from {episode.subtitle_url}: {e}")
-
-                if download_m3u8_file(
-                    variant_url,
-                    output_file=output_file,
-                    subtitle_file=subtitle_file,
-                    audio_only=config.audio_only,
-                ):
+    tasks = [worker(ep) for ep in episodes_to_download]
+    if tasks:
+        try:
+            for coro in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Downloading episodes"):
+                status, episode = await coro
+                if status == "skipped":
+                    skipped_episodes.append(episode)
+                    append_downloaded_episode(config.download_log, episode)
+                elif status == "downloaded":
                     downloaded_episodes.append(episode)
                     append_downloaded_episode(config.download_log, episode)
-                else:
-                    log.error(f"Unable to download m3u8. Check the url with ffmpeg: {episode.url}")
-
-                if subtitle_file and subtitle_file.exists():
-                    subtitle_file.unlink()
-            except Exception as e:
-                log.error(f"Failed to download episode '{episode.title}' from {episode.url}: {e}")
-                skipped_episodes.append(episode)
-                continue
-
-    except KeyboardInterrupt:
+        except KeyboardInterrupt:
+            # If the user cancels the download, we want to exit cleanly
+            pass
         log.warning("Stopping.")
     return downloaded_episodes, skipped_episodes
 

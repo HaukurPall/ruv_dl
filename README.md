@@ -29,6 +29,7 @@ The original plan was to fork that repo and improve upon it, but it was easier t
 
 ## Versions
 
+- 1.6.0: Added parallel download support.
 - 1.5.0: Enhanced file naming with episode IDs to prevent collisions and added automatic migration for existing files. Implemented sorting for programs (alphabetical) and episodes (chronological) in all outputs. Optimized audio-only downloads to use lower bandwidth streams.
 - 1.4.0: Added `--audio-only` flag to download commands for audio-only downloads (saved as .mp4 with mov_text subtitles). Refactored RÚV client to use immutable frozen dataclasses instead of TypedDict for better type safety. Improved download reliability by using variant-specific playlist URLs instead of master playlists.
 - 1.3.0: Removed `organize` and `split-episode` commands to simplify the codebase. Fixed intermittent `PersistedQueryNotFound` errors by switching from GET requests with persisted query hashes to POST requests with full GraphQL queries.
@@ -67,10 +68,11 @@ As a side-effect, some files are generated in the **current working directory** 
 ## Main command
 
 `ruv-dl` is the main command.
-It takes two options:
+It takes the following options:
 
 - `--work-dir`: The working directory where the program will store its files. By default, the current working directory.
 - `--log-level`: The log level. By default it is `WARNING`.
+- `--max-parallel-downloads` / `-j`: Maximum number of parallel downloads. Default is 1.
 
 For more details see `ruv-dl --help` or any of the subcommands' help `ruv-dl <subcommand> --help`.
 
